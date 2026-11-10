@@ -144,7 +144,7 @@ table.tb tr.sel td{background:var(--acc-soft);font-weight:650}
 details.sec>summary .cnt:empty{display:none}
 textarea.code{width:100%;min-height:150px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
 .cr td.y{background:#fff2a8}
-#sv{font-size:15px;opacity:.75;min-width:18px;text-align:center}#sv[data-s="w"]{opacity:1;color:#ffd27a}#sv[data-s="e"]{opacity:1;color:#ff9c8a;font-size:18px}
+#sv{font-size:18px;min-width:18px;text-align:center;color:#ff9c8a}#sv[hidden],#bBk[hidden]{display:none}#bBk{background:transparent;border:0;font-size:19px;position:relative}#bBk::after{content:"";position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:#f59c2f;border:2px solid var(--top,#0b3a5a)}
 .rep:focus-visible,.ph figure:focus-visible,.doc .n:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
 .chk label{font-size:14px}
 /* modale */
@@ -186,7 +186,7 @@ textarea.code{width:100%;min-height:150px;font:12px/1.4 ui-monospace,Menlo,Conso
   <button class="ib" id="bBack" hidden aria-label="Retour">‹</button>
   <img id="lg" src="logo-dark.png" alt="Tiango">
   <h1 id="ttl">Tiango</h1>
-  <span id="sv" role="status" aria-label="Tout est enregistré sur cet appareil">✓</span>
+  <button class="ib" id="bBk" hidden aria-label="Sauvegarder dans un fichier">💾</button><span id="sv" role="status" hidden>⚠</span>
   <button class="ib" id="bMenu" aria-label="Menu">☰</button>
 </div></header>
 <main class="wrap" id="main"></main>

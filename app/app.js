@@ -162,7 +162,7 @@ async function txm(names,fn){const d=await db();return new Promise((ok,ko)=>{con
   try{fn(n=>t.objectStore(n))}catch(e){try{t.abort()}catch(_){}ko(e)}})}
 const DB={
   get:(st,k)=>tx(st,'readonly',s=>s.get(k)), all:st=>tx(st,'readonly',s=>s.getAll()),
-  put:(st,v,k)=>tx(st,'readwrite',s=>{k===undefined?s.put(v):s.put(v,k)}), del:(st,k)=>tx(st,'readwrite',s=>{s.delete(k)}),
+  put:(st,v,k)=>tx(st,'readwrite',s=>{k===undefined?s.put(v):s.put(v,k)}).then(r=>{if(st!=='kv')modTouch();return r}), del:(st,k)=>tx(st,'readwrite',s=>{s.delete(k)}).then(r=>{modTouch();return r}),
   filesOf:id=>tx('files','readonly',s=>s.index('rep').getAll(id))
 };
 /* éléments visibles : la corbeille est exclue */
@@ -174,9 +174,17 @@ let item=null;                        /* élément courant de la suite : CTI, si
 let saveT=null, itemT=null, dirty=false, idirty=false, pend=0;
 const urlOf=f=>{if(!urls.has(f.id))urls.set(f.id,URL.createObjectURL(f.blob));return urls.get(f.id)};
 const freeUrls=()=>{urls.forEach(u=>URL.revokeObjectURL(u));urls.clear()};
-/* témoin d'enregistrement dans le bandeau : ● en cours, ✓ enregistré, ⚠ échec */
-function mark(s){const e=$('#sv');if(!e)return;if(s==='ok'&&(pend||dirty||idirty))return;e.dataset.s=s;e.textContent=s==='w'?'●':s==='e'?'⚠':'✓';
-  e.title=e.ariaLabel=s==='w'?'Enregistrement en cours':s==='e'?'Échec de l\'enregistrement':'Tout est enregistré sur cet appareil'}
+/* témoin d'enregistrement : invisible quand tout va bien ; ● pendant l'écriture ; ⚠ en cas d'échec */
+function mark(s){const e=$('#sv');if(!e)return;if(s==='ok'&&(pend||dirty||idirty))return;e.dataset.s=s;e.textContent=s==='w'?'●':'⚠';e.hidden=s==='ok'||s==='w';
+  e.title=e.ariaLabel=s==='e'?'Échec de l\'enregistrement sur cet appareil':''}
+/* témoin de sauvegarde : 💾 orange tant que des modifications n'ont pas été sauvegardées dans un fichier */
+let modT=null;
+function modTouch(){clearTimeout(modT);modT=setTimeout(async()=>{try{await DB.put('kv',Date.now(),'lastMod')}catch(e){}bkRefresh()},800)}
+async function bkRefresh(){const b=$('#bBk');if(!b)return;
+  try{const lb=await DB.get('kv','lastBackup'),lm=await DB.get('kv','lastMod'),t=lb?(typeof lb==='object'?lb.t:lb):0;
+    const n=(await live('reps')).length+(await live('items')).length+((profil&&(profil.nom||profil.prenom))?1:0);
+    const stale=n>0&&(!t||(lm&&lm>t));b.hidden=!stale;
+    b.title=b.ariaLabel=t?'Des modifications ne sont pas sauvegardées dans un fichier (dernière sauvegarde le '+frDate(new Date(t).toISOString().slice(0,10))+'). Appuyez pour sauvegarder':'Aucune sauvegarde dans un fichier : appuyez pour sauvegarder'}catch(e){}}
 /* put() rend true si l'écriture a réussi, false sinon (jamais d'exception) */
 function put(store,o){pend++;mark('w');return DB.put(store,o).then(()=>{pend--;mark('ok');return true},e=>{pend--;mark('e');toast('Enregistrement impossible : '+((e&&e.message)||'espace insuffisant ?')+'. Votre saisie est conservée à l\'écran.',7000);return false})}
 /* en cas d'échec, la fiche reste marquée « à enregistrer » : la saisie n'est pas abandonnée et la prochaine tentative la reprendra */
@@ -446,12 +454,12 @@ $$('#bar button').forEach(b=>b.onclick=()=>{const a=b.dataset.a;
 
 /* ---------- Profil du guide ---------- */
 function editProfil(){
-  const d={...profil};
-  $('#modal').innerHTML=`<div class="modal"><div class="sheet"><h2>Mon profil de guide</h2><p class="mute">Repris en tête de chaque compte-rendu. Ces informations restent sur cet appareil.</p>
+  const d={...profil,...profilId()};
+  $('#modal').innerHTML=`<div class="modal"><div class="sheet"><h2>Mon profil de guide</h2><p class="mute">Repris en tête de chaque compte-rendu. Ces informations restent sur cet appareil. Le prénom et le nom sont ceux du titulaire de la licence : ils ne se modifient pas ici.</p>
    <div class="grid" id="pf">${PROFIL.map(f=>field(f,d,'pf_')).join('')}</div>
    <div class="row" style="margin-top:16px"><button class="btn sec grow" id="mNo">Annuler</button><button class="btn grow" id="mOk">Enregistrer</button></div></div></div>`;
-  bindFields($('#pf'),d);$('#mNo').onclick=closeModal;
-  $('#mOk').onclick=async()=>{profil=d;await DB.put('kv',profil,'profil');closeModal();toast('Profil enregistré');if(view==='list')renderList()};
+  bindFields($('#pf'),d);$$('#pf input').forEach(i=>{if(/_(prenom|nom)$/.test(i.id||'')){i.readOnly=true;i.setAttribute('aria-readonly','true');i.style.opacity='.75'}});$('#mNo').onclick=closeModal;
+  $('#mOk').onclick=async()=>{profil=d;await DB.put('kv',profil,'profil');modTouch();closeModal();toast('Profil enregistré');if(view==='list')renderList()};
 }
 /* ---------- Compte-rendu : un modèle unique, rendu en HTML (écran, PDF) et en Word ---------- */
 const val=(d,[k,,t])=>t==='yn'?[d[k],d[k+'_d']].filter(Boolean).join(' — '):t==='date'?frDate(d[k]):String(d[k]??'').trim();
@@ -513,10 +521,18 @@ async function renderSyn(){
 async function deliver(blob,name){
   const file=new File([blob],name,{type:blob.type});
   if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[file]})){
-    try{await navigator.share({files:[file]});return true}catch(e){if(e.name==='AbortError')return false}}   /* partage annulé : rien n'a été remis */
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),60000);toast('Fichier enregistré : '+name);return true;
+    try{await navigator.share({files:[file]});return true}catch(e){if(e.name==='AbortError')return false}
+    /* iOS refuse le partage quand la préparation a duré (geste de l'utilisateur expiré) : on demande un appui, qui le rétablit */
+    return shareSheet(file,blob,name)}
+  return download(blob,name);
 }
+function download(blob,name){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),60000);toast('Fichier enregistré : '+name);return true}
+function shareSheet(file,blob,name){return new Promise(res=>{
+  $('#modal').innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="Fichier prêt"><div class="sheet"><h2>Fichier prêt</h2><p class="mute">« ${esc(name)} » (${human(blob.size)}). Appuyez sur le bouton, puis choisissez « Enregistrer dans Fichiers », AirDrop ou votre messagerie.</p><div class="row" style="margin-top:14px"><button class="btn sec grow" id="shNo">Annuler</button><button class="btn acc grow" id="shGo">Enregistrer le fichier</button></div></div></div>`;
+  $('#shNo').onclick=()=>{closeModal();res(false)};
+  $('#shGo').onclick=async()=>{try{await navigator.share({files:[file]});closeModal();res(true)}catch(e){if(e.name==='AbortError')return;closeModal();toast('Partage impossible : '+((e&&e.message)||e.name)+'. Téléchargement du fichier…',5000);res(download(blob,name))}}})}
 
 /* ---------- Archive ZIP minimale (sans compression), pour fabriquer le .docx ---------- */
 const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c}return t})();
@@ -602,8 +618,8 @@ async function renderItems(kind){
    ${L.length?L.map(i=>`<div class="card rep" data-id="${esc(i.id)}"><div class="th">${K.ico}</div><div class="grow"><h3>${esc(K.title(i))}</h3><div class="mute">${esc(K.sub(i))}</div>${K.pills(i).filter(Boolean).map(p=>`<span class="pill">${esc(p)}</span>`).join('')}</div></div>`).join('')
      :`<div class="empty"><b>${K.empty}</b>${K.hint}</div>`}`;
   cards($('#main'),id=>go(kind,id));
-  $('#iNew').onclick=async()=>{if(kind==='vis')return pickSite(discoursNew);if(!(await gate(kind)))return;const it=NEW[kind]();await DB.put('items',it);go(kind,it.id)};
-  if(K.ai){$('#iAi').onclick=()=>aiSheet(kind);$('#iImp').onclick=()=>importSheet()}
+  $('#iNew').onclick=async()=>{if(kind==='vis')return pickSite(discoursChoice);if(!(await gate(kind)))return;const it=NEW[kind]();await DB.put('items',it);go(kind,it.id)};
+  if(K.ai){$('#iAi').onclick=()=>kind==='vis'?visAiStart():aiSheet(kind);$('#iImp').onclick=()=>importSheet()}
 }
 const NEW={
   cti:()=>({id:uid(),kind:'cti',updated:Date.now(),titre:'',sous:'',date:today(),debut:'09:00',fin:'',note:'',h:{guide:[profil.prenom,profil.nom].filter(Boolean).join(' '),urgences:'15 SAMU · 17 Police · 18 Pompiers · 112 · 196 CROSS (urgence en mer) · 114 (SMS, personnes sourdes et malentendantes)'},lignes:[],pieces:[],apres:[],repId:'',contacts:[],circId:'',jour:'',ed:''}),
@@ -795,6 +811,7 @@ function ctiModel(c,x={}){
 }
 /* ================= DISCOURS DE VISITE d'un site à visiter : station par station, multilingue ================= */
 let vLang='fr', play=null, playT=null, visBack=null;
+const nextMCode=v=>'M'+(Math.max(-1,...v.modules.map(m=>{const x=/^M(\d+)$/i.exec(String(m.code||'').trim());return x?+x[1]:-1}))+1);
 const MT=[['station','Station'],['pause','Pause'],['extension','Extension / variante']];
 const ml=(o,l)=>(o&&(o[l]||o.fr||Object.values(o)[0]))||'';
 const modByCode=(v,code)=>v.modules.find(m=>(m.code||'').trim().toLowerCase()===code.trim().toLowerCase());
@@ -809,6 +826,7 @@ VIEWS.vis={item:1,get back(){return visBack&&item&&visBack[1]===item.lieuId?visB
   if(!OPEN.has('v_init')){OPEN.add('v_init');OPEN.add(v.modules.length?'v_mod':'v_id')}
   const L=()=>vLang;
   $('#main').innerHTML=`<div class="card"><div class="row"><button class="btn acc grow" id="vPlay"${v.modules.length?'':' disabled'}>▶ Mode visite</button><button class="btn grow" id="vPv">📄 Dossier (Word, PDF)</button></div>
+    <div class="row" style="margin-top:10px"><button class="btn sec grow" id="vAi">✨ Faire rédiger par une IA</button><button class="btn sec grow" id="vImp">📥 Importer</button></div>
     <div class="row" style="margin-top:10px"><button class="btn sec grow" id="vExp">⬆ Exporter au format Tiango</button></div>
     <div class="f"><label>Langue affichée pour les textes</label><div class="seg" id="vLg">${v.langs.map(l=>`<button type="button" data-l="${esc(l)}" class="${l===vLang?'on':''}">${esc(lname(l))}</button>`).join('')}</div></div></div>
    ${sec('v_id','🏛️','Identité du discours',`<div class="grid" id="vId">${[['lieuId','Site à visiter (fiche de repérage) — obligatoire','select',lx.map(r=>[r.id,lieuNom(r)+(r.d.ville?' — '+r.d.ville:'')])],['nom','Titre du discours (ex. Visite de la cathédrale)','text','wide'],['type','Type de site','text'],['public','Public visé','text'],['langsTxt','Langues (codes séparés par des virgules : fr, en, es, de…)','text'],['angle','Fil rouge retenu','textarea'],['resume','Présentation en quelques lignes','textarea']].map(f=>field(f,{...v,langsTxt:v.langs.join(', ')},'vi_')).join('')}</div><div id="vLb"></div>`)}
@@ -832,13 +850,17 @@ VIEWS.vis={item:1,get back(){return visBack&&item&&visBack[1]===item.lieuId?visB
   const drawLb=()=>{const b=$('#vLb');if(!b)return;const ok=v.lieuId&&lx.some(r=>r.id===v.lieuId);b.innerHTML=(ok?'':'<div class="box warn" style="margin-top:10px">Ce discours n\'est rattaché à aucun site à visiter. Choisissez le site ci-dessus (créez-le d\'abord dans l\'onglet Sites s\'il n\'existe pas).</div>')+(ok?'<div class="row" style="margin-top:10px"><button type="button" class="btn sec sm grow" id="vLo">📍 Fiche de repérage du site</button></div>':'');
     const o=$('#vLo');if(o)o.onclick=async()=>{await saveItem(true);openLieu(v.lieuId,['vis',v.id])};
     const nv=v.modules.filter(m=>m.type!=='pause'&&m.statut!=='Validé').length,nc=(v.conf||[]).filter(c=>!c.done&&String(c.t||'').trim()).length;
+    const rp=lx.find(r=>r.id===v.lieuId),nm=t=>strip(t).replace(/[^a-z0-9]+/g,' ').trim(),mods=v.modules.filter(m=>m.type!=='pause').map(m=>nm(m.lieu)+'|'+nm(m.titre&&m.titre.fr)),
+      miss=rp?(rp.points||[]).filter(p=>nm(p.nom)&&!mods.some(x=>{const k=nm(p.nom);return x.split('|').some(y=>y&&(y.includes(k)||k.includes(y)))})):[];
+    if(miss.length){b.insertAdjacentHTML('beforeend',`<div class="box warn" style="margin-top:10px"><b class="l">Points du site sans discours</b>${miss.map(p=>esc(p.nom)).join(' · ')}<div class="row" style="margin-top:8px"><button type="button" class="btn sec sm grow" id="vMiss">＋ Ajouter un module pour ${miss.length>1?'chacun':'ce point'}</button></div></div>`);
+      $('#vMiss').onclick=async()=>{miss.forEach(p=>v.modules.push({code:nextMCode(v),type:'station',lieu:String(p.nom).trim(),duree:p.duree?String(p.duree):'',titre:{},texte:{}}));await saveItem(true);VIEWS.vis.r()}}
     b.insertAdjacentHTML('beforeend',`<div class="box ${nv||nc?'warn':''}" style="margin-top:10px"><b class="l">Avant le départ</b>${nv?nv+' module'+(nv>1?'s':'')+' non validé'+(nv>1?'s':'')+' (statut à « Validé » après relecture et recoupement).':'Tous les modules sont validés.'}${nc?'<br>'+nc+' point'+(nc>1?'s':'')+' à confirmer (section « Points à confirmer »).':''}</div>`)};drawLb();
   $('#vId [data-k="langsTxt"]').onchange=()=>{saveItem(true);VIEWS.vis.r()};
   $('[data-ml="secu"]').oninput=e=>{(v.secu=v.secu||{})[vLang]=e.target.value;saveItem()};
   const cnt=(k,a)=>()=>setCnt(k,String(a.length));
   editList($('#vMod'),v.modules,[['code','Code (M0, M1, P1, EXT-A…)','text'],['type','Nature','select',MT],['lieu','Lieu précis','text','wide'],['duree','Durée sur place (minutes)','number'],['parole','Temps de parole (minutes)','number'],
      ['voir','Ce que l\'on voit','textarea'],['cle','Message clé','textarea'],['place','Où placer le groupe','textarea'],['consigne','Consigne de conduite (jamais prononcée)','textarea'],['titre','Titre de la station','mlt'],['texte','Discours','ml','tall'],['statut','Statut de validation','select',['Brouillon','À recouper','Validé']],['valide','Validé par, le (nom, date)','text'],['src','Source du propos (auteur, titre, page, date de consultation)','textarea']],
-    {lang:L,add:'＋ Ajouter un module',blank:()=>({code:'M'+v.modules.filter(m=>m.type!=='pause'&&m.type!=='extension').length,type:'station',titre:{},texte:{}}),title:m=>[m.code,m.lieu].filter(Boolean).join(' — '),after:cnt('v_mod',v.modules),
+    {lang:L,add:'＋ Ajouter un module',blank:()=>({code:nextMCode(v),type:'station',titre:{},texte:{}}),title:m=>[m.code,m.lieu].filter(Boolean).join(' — '),after:cnt('v_mod',v.modules),
      intro:'Chaque module est une étape autonome : un site, une durée, un message clé et le discours dans chaque langue.',
      extra:m=>{const miss=v.langs.filter(l=>!(m.texte||{})[l]),dup=dupCodes(v).includes((m.code||'').trim().toLowerCase());return (dup?`<div class="box warn" style="margin-top:8px">Le code <b>${esc(m.code)}</b> est utilisé par plusieurs modules : les formules ne retrouveraient que le premier. Donnez à chaque module un code différent.</div>`:'')+(m.type==='pause'||!miss.length?'':`<p class="mute" style="margin:8px 0 0">Discours manquant : ${miss.map(lname).join(', ')}</p>`)}});
   const pickBox=f=>{
@@ -866,6 +888,7 @@ VIEWS.vis={item:1,get back(){return visBack&&item&&visBack[1]===item.lieuId?visB
   checkList($('#vCf'),v.conf,{ph:'Question à poser au site, donnée à vérifier…',after:cnt('v_cf',v.conf)});
   $('#iDel').onclick=()=>delItem('ce discours');$('#iDup').onclick=dupItem;
   $('#vPv').onclick=()=>preview({title:v.nom||'Visite',name:'Dossier-visite_'+slug(v.nom),blocks:visModel(v),back:'vis'});
+  $('#vAi').onclick=async()=>{await saveItem(true);aiSheet('vis',{siteId:v.lieuId})};$('#vImp').onclick=async()=>{await saveItem(true);importSheet()};
   $('#vExp').onclick=()=>deliver(new Blob([JSON.stringify(visOut(v),null,1)],{type:'application/json'}),'visite_'+slug(v.nom)+'.tiango.json');
   $('#vPlay').onclick=()=>choosePlay(v,(seq,nom)=>{play={seq,i:0,nom,fs:19,idx:seq.map(m=>v.modules.indexOf(m))};go('visPlay')});
 }};
@@ -946,6 +969,21 @@ async function discoursNew(siteId){
   const r=(await live('reps')).map(fixRep).find(x=>x.id===siteId);if(!r)return toast('Site introuvable');
   const it=NEW.vis();it.lieuId=r.id;it.nom=lieuNom(r);it.lieu=String(r.d.ville||'');it.type=String(r.d.type||'');
   await DB.put('items',it);visBack=['edit',r.id];go('vis',it.id)}
+/* création d'un discours : par l'IA (recommandé, un module par point du site) ou à la main */
+function discoursChoice(siteId,intro){
+  $('#modal').innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="Créer le discours"><div class="sheet"><h2>Créer le discours de visite</h2>
+   <p class="mute">${intro?esc(intro)+' ':''}Avec l'IA, le discours arrive déjà rédigé : un module par point repéré sur le site, dans chaque langue. Il reste à le relire et à le valider.</p>
+   <div style="display:grid;gap:10px;margin-top:10px"><button class="btn acc" id="dcAi">✨ Faire rédiger par une IA</button><button class="btn sec" id="dcImp">📥 J'ai déjà la réponse de l'IA : importer</button><button class="btn sec" id="dcMan">✍️ Écrire à la main</button><button class="btn sec" id="dcNo">Annuler</button></div></div></div>`;
+  $('#dcNo').onclick=closeModal;$('#dcAi').onclick=()=>aiSheet('vis',{siteId});$('#dcImp').onclick=()=>importSheet();
+  $('#dcMan').onclick=()=>{closeModal();discoursNew(siteId)}}
+/* depuis la liste des discours : choisir le site (ses points alimentent la consigne) ou saisir un autre site */
+async function visAiStart(){
+  const L=(await live('reps')).map(fixRep).filter(r=>!r.ctiId).sort((a,b)=>lieuNom(a).localeCompare(lieuNom(b),'fr'));
+  if(!L.length)return aiSheet('vis');
+  $('#modal').innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="Pour quel site ?"><div class="sheet"><h2>Discours pour quel site ?</h2>
+   <div class="f"><label for="pkS">Site à visiter déjà enregistré</label><select id="pkS"><option value="">Choisir…</option>${L.map(r=>`<option value="${esc(r.id)}">${esc(lieuNom(r)+(r.d.ville?' — '+r.d.ville:''))}</option>`).join('')}</select></div>
+   <div class="row" style="margin-top:12px"><button class="btn grow" id="pkOk">Continuer</button><button class="btn sec grow" id="pkOther">Un autre site</button></div><div class="row" style="margin-top:8px"><button class="btn sec grow" id="pkNo">Annuler</button></div></div></div>`;
+  $('#pkNo').onclick=closeModal;$('#pkOther').onclick=()=>aiSheet('vis');$('#pkOk').onclick=()=>{const id=$('#pkS').value;if(!id)return toast('Choisissez un site');aiSheet('vis',{siteId:id})}}
 async function pickSite(cb){
   const L=(await live('reps')).map(fixRep).filter(r=>!r.ctiId).sort((a,b)=>String(a.d.ville||'~').localeCompare(String(b.d.ville||'~'),'fr')||lieuNom(a).localeCompare(lieuNom(b),'fr'));
   if(!L.length)return toast('Créez d\'abord un site à visiter (onglet Sites)',4500);
@@ -1137,7 +1175,7 @@ async function drawUses(){
    ${u.cir.length+u.rpg.length+u.vis.length+u.cti.length?'':'<p class="mute">Ce site n\'est encore utilisé nulle part.</p>'}`;
   const n=u.cir.length+u.rpg.length+u.vis.length+u.cti.length,c=$('[data-c="uses"]');if(c){c.textContent=n;c.classList.toggle('full',n>0)}
   $$('[data-go]',b).forEach(e=>{e.onkeydown=k=>{if(k.key==='Enter')e.click()};e.onclick=()=>{if(e.dataset.go==='vis')visBack=['edit',rep.id];go(e.dataset.go,e.dataset.id)}});
-  $('#uRpg').onclick=()=>newRpg({lieuId:rep.id});const us=$('#uSite');if(us)us.onclick=()=>discoursNew(rep.id);
+  $('#uRpg').onclick=()=>newRpg({lieuId:rep.id});const us=$('#uSite');if(us)us.onclick=()=>discoursChoice(rep.id);
 }
 /* ================= ESPACE CIRCUITS : jours, parties de journée, sites, séjours, budget ================= */
 const newJour=()=>({id:uid(),titre:'',debut:'09:00',sejId:'',parts:{matin:[],apres:[],soir:[]}});
@@ -1348,21 +1386,25 @@ function cirModel(c,L,pres){
 NEW.pre=()=>({id:uid(),kind:'pre',updated:Date.now(),nom:'',role:'Restaurant',contact:'',tel:'',tel2:'',mail:'',adresse:'',web:'',note:''});
 KINDS.pre={list:'preList',one:'prestataire',ico:'📇',empty:'Annuaire vide',hint:'',add:'＋ Nouveau prestataire',
   title:i=>i.nom||'Prestataire sans nom',sub:i=>[i.role,i.tel].filter(Boolean).join(' · '),pills:i=>[i.contact||'']};
+const PRES_ICO={'Chauffeur':'🚐','Autocariste':'🚌','Société sous-traitante':'🏢','Guide local':'🧭','Guide-conférencier':'🎙️','Restaurant':'🍽️','Hébergement':'🛏️','Site / gestionnaire':'🏛️','Autre':'📇'};
+const presIco=p=>PRES_ICO[p.role]||'📇';
 const telHref=t=>'tel:'+String(t||'').replace(/[^\d+]/g,'');
 let preFilter='',preQ='';
 VIEWS.preList={top:1,t:()=>'Tiango '+sub2('Annuaire des prestataires'),async r(){
   const all=(await live('items')).filter(i=>i.kind==='pre').map(fixItem).sort((a,b)=>String(a.role).localeCompare(String(b.role),'fr')||String(a.nom).localeCompare(String(b.nom),'fr'));
   if(view!=='preList')return;
   $('#main').innerHTML=`<div class="row" style="margin-top:14px"><button class="btn acc grow" id="pNew">＋ Nouveau prestataire</button></div>
-   ${all.length>0?`<div class="row" style="margin-top:10px"><select id="pRole" aria-label="Filtrer par rôle"><option value="">Tous les rôles</option>${PRES_ROLES.map(r=>`<option${r===preFilter?' selected':''}>${esc(r)}</option>`).join('')}</select></div><input class="search" id="pQ" type="search" placeholder="Rechercher un nom, une ville, un numéro…" aria-label="Rechercher" value="${esc(preQ)}">`:''}
+   <div class="row" style="margin-top:10px"><button class="btn sec grow" id="pImp">📥 Importer des contacts (Excel, IA)</button></div>
+   ${all.length>0?`<div class="row" style="margin-top:10px"><select id="pRole" aria-label="Filtrer par rôle"><option value="">Tous les rôles</option>${PRES_ROLES.map(r=>`<option${r===preFilter?' selected':''}>${esc(r)}</option>`).join('')}</select></div><input class="search" id="pQ" type="search" placeholder="Rechercher un nom, une ville, un métier, une note…" aria-label="Rechercher" value="${esc(preQ)}">`:''}
    <div id="pL"></div>`;
-  const draw=()=>{const q=strip(preQ),L=all.filter(p=>(!preFilter||p.role===preFilter)&&(!q||strip([p.nom,p.contact,p.tel,p.adresse,p.role].join(' ')).includes(q)));
-    $('#pL').innerHTML=L.length?L.map(p=>`<div class="card rep" data-id="${esc(p.id)}"><div class="th">${KINDS.pre.ico}</div><div class="grow"><h3>${esc(p.nom||'Prestataire sans nom')}</h3><div class="mute">${esc([p.contact,p.tel].filter(Boolean).join(' · '))}</div><span class="pill">${esc(p.role||'Autre')}</span>${/\d{6}/.test(String(p.tel).replace(/\D/g,''))?`<a class="pill" href="tel:${esc(String(p.tel).replace(/[^+\d]/g,''))}">📞 Appeler</a>`:''}</div></div>`).join('')
+  const draw=()=>{const qs=strip(preQ).split(/\s+/).filter(Boolean),L=all.filter(p=>{if(preFilter&&p.role!==preFilter)return false;const h=strip([p.nom,p.contact,p.tel,p.tel2,p.mail,p.web,p.adresse,p.role,p.note].join(' '));return qs.every(w=>h.includes(w))});
+    $('#pL').innerHTML=L.length?L.map(p=>`<div class="card rep" data-id="${esc(p.id)}"><div class="th">${presIco(p)}</div><div class="grow"><h3>${esc(p.nom||'Prestataire sans nom')}</h3><div class="mute">${esc([p.contact,p.tel].filter(Boolean).join(' · '))}</div>${p.note?`<div class="mute" style="font-size:13px">${esc(String(p.note).replace(/\s+/g,' ').slice(0,90))}</div>`:''}<span class="pill">${esc(p.role||'Autre')}</span>${/\d{6}/.test(String(p.tel).replace(/\D/g,''))?`<a class="pill" href="tel:${esc(String(p.tel).replace(/[^+\d]/g,''))}">📞 Appeler</a>`:''}</div></div>`).join('')
       :`<div class="empty"><b>${all.length?'Aucun résultat':'Annuaire vide'}</b>${all.length?'':'Notez ici une fois pour toutes vos chauffeurs, autocaristes, restaurants, guides locaux, sous-traitants et hébergements, avec leur téléphone. Vous les choisirez ensuite dans les circuits et les CTI.'}</div>`;
     cards($('#pL'),id=>go('pre',id));$$('#pL a[href^="tel:"]').forEach(a=>a.onclick=e=>e.stopPropagation())};
   draw();
   if($('#pRole'))$('#pRole').onchange=e=>{preFilter=e.target.value;draw()};
   if($('#pQ'))$('#pQ').oninput=e=>{preQ=e.target.value;draw()};
+  $('#pImp').onclick=()=>preAiSheet();
   $('#pNew').onclick=async()=>{if(!(await gate('pre')))return;const p=NEW.pre();if(preFilter)p.role=preFilter;await DB.put('items',p);go('pre',p.id)};
 }};
 VIEWS.pre={item:1,back:'preList',t:()=>esc(item.nom||'Nouveau prestataire')+sub2('Prestataire'),async r(){
@@ -1417,6 +1459,55 @@ function ctiFlags(c,reps){const out=[];let t=t2m(c.debut);const pax=parseInt(Str
     if(o!==null&&s<o)out.push({lvl:'att',cat:'hor',ico:'🕘',short:'Avant l\'ouverture',txt:'Arrivée à '+hm(s)+', le site ouvre à '+hm(o),lieu:l.lieu||lieuNom(r)});
     if(f2!==null&&num(l.duree)&&e>f2)out.push({lvl:'att',cat:'hor',ico:'🕘',short:'Après la fermeture',txt:'Fin à '+hm(e)+', le site ferme à '+hm(f2),lieu:l.lieu||lieuNom(r)})});
   return out.sort((a,b)=>LVL[a.lvl]-LVL[b.lvl])}
+
+/* ---------- Import de contacts en nombre : format Tiango, préparé par une IA à partir d'un fichier Excel ---------- */
+const FMT_PRE=`{
+ "format": "tiango-annuaire", "version": 1,
+ "prestataires": [{
+   "nom": "société, établissement ou personne",
+   "role": "Chauffeur | Autocariste | Société sous-traitante | Guide local | Guide-conférencier | Restaurant | Hébergement | Site / gestionnaire | Autre",
+   "contact": "nom et fonction de l'interlocuteur", "tel": "", "tel2": "", "mail": "", "adresse": "", "web": "",
+   "note": "métier précis, zone géographique, langues, capacité, tarif, remarques : tout ce qui permettra de retrouver ce contact par une recherche"
+ }]
+}`;
+const prePrompt=()=>`Tu m'aides à transformer un fichier de contacts (Excel ou CSV, joint à ce message ou collé ci-dessous) en annuaire de prestataires pour l'application Tiango, utilisée par des guides touristiques.
+
+CE QUI EST ATTENDU
+- Une entrée par contact, sans en oublier ni en fusionner.
+- "role" : choisis dans la liste proposée (un hôtel, un camping ou un gîte est « Hébergement » ; un guide accompagnateur ou local est « Guide local » ; un guide conférencier est « Guide-conférencier »). Si aucun ne convient : « Autre ».
+- "note" : mets-y tout ce qui n'a pas de champ à lui (spécialité, ville ou région couverte, langues, capacité, tarif, jours de fermeture, remarques). La recherche de l'application porte sur ce champ : écris-le avec des mots simples et précis (ex. « guide accompagnatrice, région de Saint-Malo, anglais, 350 € la journée »).
+- Les numéros de téléphone au format national lisible (06 12 34 56 78).
+
+RÈGLES
+- N'invente rien : laisse vide ce que le fichier ne contient pas.
+- Réponds uniquement par un objet JSON valide, sans texte avant ni après, qui respecte exactement cette structure (les valeurs séparées par « | » sont des choix) :
+
+${FMT_PRE}`;
+function preAiSheet(){
+  $('#modal').innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="Importer des contacts"><div class="sheet"><h2>Importer des contacts</h2>
+   <p class="mute">1. Copiez la consigne. 2. Donnez-la à Claude ou à l'IA de votre choix avec votre fichier Excel (joint ou collé). 3. Rapportez sa réponse ici avec « Importer ».</p>
+   <div class="f"><label for="prP">Consigne à transmettre à l'IA</label><textarea class="code" id="prP" readonly></textarea></div>
+   <div class="row" style="margin-top:12px"><button class="btn acc grow" id="prCp">Copier la consigne</button><button class="btn sec grow" id="prImp">📥 Importer la réponse</button></div>
+   <div class="row" style="margin-top:10px"><button class="btn sec grow" id="mNo">Fermer</button></div></div></div>`;
+  $('#prP').value=prePrompt();$('#mNo').onclick=closeModal;$('#prImp').onclick=()=>importSheet();
+  $('#prCp').onclick=async()=>{try{await navigator.clipboard.writeText($('#prP').value)}catch(e){$('#prP').select();document.execCommand('copy')}toast('Consigne copiée : collez-la dans l\'IA')}}
+async function preImport(j){
+  const A_=Array.isArray(j.prestataires)?j.prestataires:[];if(!A_.length)throw new Error('aucun prestataire dans ce fichier');
+  const nm=t=>strip(t).replace(/[^a-z0-9]+/g,' ').trim(),dg=t=>String(t||'').replace(/\D/g,''),S_=v=>v==null?'':String(v).trim();
+  const have=(await live('items')).filter(i=>i.kind==='pre').map(fixItem),seen=new Set(have.map(p=>nm(p.nom)+'|'+dg(p.tel)));
+  const add=[],dup=[];
+  for(const x of A_){const o=O(x),nom=S_(o.nom);if(!nom)continue;
+    const ro=PRES_ROLES.find(r=>nm(r)===nm(o.role))||(/h[oô]tel|camping|g[iî]te|h[ée]bergement/i.test(S_(o.role))?'Hébergement':'Autre');
+    const p={...NEW.pre(),nom,role:ro,contact:S_(o.contact),tel:S_(o.tel),tel2:S_(o.tel2),mail:S_(o.mail),adresse:S_(o.adresse),web:S_(o.web),note:S_(o.note)},k=nm(nom)+'|'+dg(p.tel);
+    if(seen.has(k))dup.push(nom);else{seen.add(k);add.push(p)}}
+  if(!add.length)throw new Error('tous ces contacts sont déjà dans l\'annuaire ('+dup.length+')');
+  if(!(await gate('pre',add.length)))return;
+  $('#modal').innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="Importer les contacts"><div class="sheet"><h2>Importer ${add.length} contact${add.length>1?'s':''} ?</h2>
+   <p class="mute">${dup.length?dup.length+' déjà présent'+(dup.length>1?'s':'')+' (même nom et même téléphone) : ignoré'+(dup.length>1?'s':'')+'. ':''}Aperçu :</p>
+   <div style="max-height:40vh;overflow:auto">${add.slice(0,40).map(p=>`<div class="doc"><span>${presIco(p)} <b>${esc(p.nom)}</b> · ${esc(p.role)}${p.tel?' · '+esc(p.tel):''}</span></div>`).join('')}${add.length>40?'<p class="mute">… et '+(add.length-40)+' autres.</p>':''}</div>
+   <div class="row" style="margin-top:14px"><button class="btn sec grow" id="mNo">Annuler</button><button class="btn acc grow" id="pvOk">Importer</button></div></div></div>`;
+  $('#mNo').onclick=closeModal;
+  $('#pvOk').onclick=async()=>{try{await txm(['items'],S=>add.forEach(p=>S('items').put(p)));closeModal();toast(add.length+' contact'+(add.length>1?'s':'')+' importé'+(add.length>1?'s':''),4500);modTouch();go('preList')}catch(e){toast('Import impossible : '+e.message,6000)}}}
 /* ================= REPÉRAGES : sorties de terrain datées, sur un site ou sur un circuit entier ================= */
 NEW.rpg=()=>({id:uid(),kind:'rpg',updated:Date.now(),titre:'',date:today(),cible:'lieu',circId:'',blocs:[],note:'',applied:{}});
 KINDS.rpg={list:'rpgList',one:'repérage',ico:'🧭',title:i=>i.titre||'Repérage sans titre',sub:i=>frDate(i.date),pills:i=>[i.blocs.length+' lieu'+(i.blocs.length>1?'x':'')]};
@@ -1583,6 +1674,9 @@ async function licCheck(str){
     return {state:days<0?'expiree':'valide',nom:p.n.slice(0,120),exp:p.e,days}}
   catch(e){return {state:'invalide'}}}
 async function licInit(){try{const s=await DB.get('kv','licence');LIC=s?await licCheck(s):{state:'demo'};if(LIC.state==='invalide')LIC={state:'demo'}}catch(e){LIC={state:'demo'}}}
+/* prénom et nom du profil : imposés par la licence (démonstration : « Licence » / « Démonstration ») */
+function profilId(){if(LIC.state==='valide'||LIC.state==='expiree'){const t=String(LIC.nom||'').trim().split(/\s+/);return {prenom:t[0]||'',nom:t.slice(1).join(' ')}}return {prenom:'Licence',nom:'Démonstration'}}
+async function profilSync(){const id=profilId();if(profil.prenom!==id.prenom||profil.nom!==id.nom){profil={...profil,...id};try{await DB.put('kv',profil,'profil')}catch(e){}}}
 const licLine=()=>LIC.state==='valide'?'Licence Tiango : '+LIC.nom+', valable jusqu\'au '+frDate(LIC.exp):'Version de démonstration de Tiango : tiango.fr';
 /* autorise la création d'un élément : licence valide, ou quota de démonstration non atteint */
 async function gate(key,need=1){
@@ -1603,7 +1697,7 @@ function licSheet(key){
   $('#licGo').onclick=async()=>{const s=$('#licIn').value.trim();if(!s)return toast('Collez d\'abord la clé reçue');
     const r=await licCheck(s);if(r.state==='invalide')return toast('Clé non reconnue : copiez-la en entier, sans espace ajouté',5000);
     try{await DB.put('kv',s,'licence')}catch(e){return toast('Clé non enregistrée : espace insuffisant ?',5000)}
-    LIC=r;toast(r.state==='valide'?'Licence activée au nom de '+r.nom:'Cette licence est expirée : demandez son renouvellement',5000);if(r.state==='valide')closeModal();if(VIEWS[view]&&VIEWS[view].top)VIEWS[view].r()}}
+    LIC=r;profilSync();toast(r.state==='valide'?'Licence activée au nom de '+r.nom:'Cette licence est expirée : demandez son renouvellement',5000);if(r.state==='valide')closeModal();if(VIEWS[view]&&VIEWS[view].top)VIEWS[view].r()}}
 function licBanner(){
   if(LIC.state==='valide'&&LIC.days>30)return '';
   const t=LIC.state==='valide'?`Votre licence expire dans ${LIC.days} jour${LIC.days>1?'s':''}.`:LIC.state==='expiree'?'Votre licence a expiré.':'Version de démonstration : '+Object.entries(LIC_QUOTA).slice(0,3).map(([k,v])=>v+' '+LIC_NOM[k]).join(', ')+'…';
@@ -1612,7 +1706,7 @@ document.addEventListener('click',e=>{if(e.target.id==='licOpen'){e.preventDefau
 /* ================= FORMAT TIANGO : rédaction par une IA, import, export ================= */
 const FMT_VIS=`{
  "format": "tiango-visite", "version": 1,
- "site": {"nom": "nom du site à visiter (ex. Cathédrale Saint-Samson)", "lieu": "ville, région ou pays où il se trouve (ex. Dol-de-Bretagne)", "type": ""},
+ "site": {"id": "identifiant Tiango du site s'il t'est fourni dans la consigne : recopie-le tel quel, sinon vide", "nom": "nom du site à visiter (ex. Cathédrale Saint-Samson)", "lieu": "ville, région ou pays où il se trouve (ex. Dol-de-Bretagne)", "type": ""},
  "langues": ["fr", "en", "es"],
  "public": "", "fil_rouge": "", "presentation": "",
  "fiche_pratique": [{"rubrique": "Horaires", "contenu": ""}],
@@ -1716,12 +1810,18 @@ RÈGLES
 - Réponds uniquement par un objet JSON valide, sans texte avant ni après, qui respecte exactement cette structure (les valeurs séparées par « | » sont des choix) :
 
 ${FMT_CIR}`;
-  return kind==='vis'?`Tu es un guide-conférencier expérimenté et un rédacteur rigoureux. Rédige le dossier de visite commentée du site suivant, au format Tiango.
+  const acc=d.role==='acc',role=acc?'guide accompagnateur':'guide-conférencier';
+  return kind==='vis'?`Tu es un ${role} expérimenté et un rédacteur rigoureux. Rédige le dossier de visite commentée du site suivant, au format Tiango.
 
-SITE : ${d.sujet||'[à préciser]'}${d.lieu?'\nLIEU : '+d.lieu:''}
+SITE : ${d.sujet||'[à préciser]'}${d.lieu?'\nLIEU : '+d.lieu:''}${d.siteId?'\nIDENTIFIANT TIANGO DU SITE (à recopier dans site.id) : '+d.siteId:''}
+RÔLE DU GUIDE : ${acc?'guide accompagnateur — il accompagne le groupe pendant tout le séjour ou la journée ; il n\'est pas le conférencier du site. Son discours est court et utile : mise en contexte, repères pratiques, consignes, anecdotes brèves, passage de relais au guide local ou au conférencier qui prend la visite.':'guide-conférencier — il conduit lui-même la visite commentée du site, avec un discours approfondi à chaque arrêt.'}
 LANGUES DU DISCOURS : ${lg}
 DURÉE VISÉE : ${d.duree||'à proposer, avec plusieurs formules'}
-PUBLIC : ${d.public||'adultes, tous publics'}${d.plus?'\nPRÉCISIONS : '+d.plus:''}
+PUBLIC : ${d.public||'adultes, tous publics'}${d.plus?'\nPRÉCISIONS : '+d.plus:''}${d.pts?`
+
+POINTS DU SITE DÉJÀ REPÉRÉS PAR LE GUIDE — chacun doit avoir au moins un module, dans cet ordre, avec son nom recopié à l'identique dans le champ "lieu" du module :
+${d.pts}
+Si un point mérite plusieurs discours, fais plusieurs modules. N'ajoute un module hors de cette liste que s'il est indispensable (accueil, pause) ; le guide ajoutera lui-même les autres.`:''}
 
 CE QUI EST ATTENDU
 - Un parcours découpé en modules autonomes (M0 accueil et consignes, M1, M2… ; P1 pour les pauses ; EXT-A… pour les extensions), chacun avec un site précis, une durée sur place, un temps de parole, ce que l'on voit, un message clé et l'endroit où placer le groupe.
@@ -1755,15 +1855,20 @@ RÈGLES
 
 ${FMT_CTI}`;
 }
-async function aiSheet(kind){
+async function aiSheet(kind,o={}){
   const d={},V=kind==='vis';
+  if(V&&o.siteId){const r=(await live('reps')).map(fixRep).find(x=>x.id===o.siteId);
+    if(r){d.siteId=r.id;d.sujet=lieuNom(r);d.lieu=[r.d.ville,r.d.pays].filter(Boolean).join(', ');
+      d.pts=(r.points||[]).filter(p=>String(p.nom||'').trim()).map((p,i)=>'- P'+(i+1)+' : '+String(p.nom).trim()+(p.duree?' ('+p.duree+' min)':'')+(p.note?' — '+String(p.note).replace(/\s+/g,' ').trim():'')).join('\n')}}
+  if(V)d.role='conf';
   if(kind==='cir')d.noms=(await live('reps')).map(fixRep).filter(r=>!r.ctiId).map(r=>'- '+lieuNom(r)+(r.d.ville?' ('+r.d.ville+')':'')).join('\n');
   const F=kind==='lieu'?[['sujet','Site à décrire (ex. Abbaye du Mont-Saint-Michel)','text','wide'],['lieu','Ville, pays','text'],['plus','Précisions (ce que vous savez déjà, ce qui vous intéresse)','textarea']]
     :kind==='cir'?[['sujet','Circuit (ex. Bretagne nord en 3 jours)','text','wide'],['lieu','Secteur, villes à relier','text'],['duree','Nombre de jours, période','text'],['public','Clients, effectif, transport','text'],['plus','Précisions (lieux imposés, contraintes, rythme)','textarea']]
-    :V?[['sujet','Site à présenter (ex. Cathédrale Notre-Dame de Paris)','text','wide'],['lieu','Ville, pays','text'],['langues','Langues du discours','text'],['duree','Durée visée','text'],['public','Public','text'],['plus','Précisions (angle, contraintes, ce que vous savez déjà)','textarea']]
+    :V?[['role','Rôle du guide','select',[['conf','Guide-conférencier : conduit la visite, discours approfondi'],['acc','Guide accompagnateur : accompagne le groupe, repères et relais']]],['sujet','Site à présenter (ex. Cathédrale Notre-Dame de Paris)','text','wide'],['lieu','Ville, pays','text'],['langues','Langues du discours','text'],['duree','Durée visée','text'],['public','Public','text'],['plus','Précisions (angle, contraintes, ce que vous savez déjà)','textarea']]
     :[['sujet','Prestation (ex. Excursion côte sud de Séné)','text','wide'],['lieu','Secteur, communes traversées','text'],['duree','Date, heure de début et de fin','text'],['public','Clients, effectif, moyen de transport','text'],['plus','Précisions (arrêts souhaités, contraintes)','textarea']];
   if(V)d.langues='fr, en, es';
   $('#modal').innerHTML=`<div class="modal"><div class="sheet"><h2>Faire rédiger par une IA</h2>
+   ${V&&d.pts?`<div class="box"><b class="l">Points du site repris dans la consigne</b><pre style="white-space:pre-wrap;margin:6px 0 0;font:inherit">${esc(d.pts)}</pre><p class="mute" style="margin:6px 0 0">L'IA rédige au moins un module par point.</p></div>`:V&&d.siteId?'<div class="box warn">Ce site n\'a pas encore de points : le discours sera construit sans eux. Vous pouvez les saisir dans la fiche du site avant de continuer.</div>':''}
    <p class="mute">Tiango prépare la consigne. Copiez-la dans Claude ou dans l'IA de votre choix, puis rapportez sa réponse ici avec « Importer ».</p>
    <div class="grid" id="aiF">${F.map(f=>field(f,d,'ai_')).join('')}</div>
    <div class="f"><label for="aiOut">Consigne à transmettre à l'IA</label><textarea class="code" id="aiOut" readonly></textarea></div>
@@ -1787,6 +1892,7 @@ async function importAny(text){
   let j;try{j=JSON.parse(text.slice(a,b+1))}catch(e){throw new Error('le texte est incomplet ou mal formé (réponse de l\'IA coupée ?). Demandez-lui de renvoyer le JSON complet')}
   if(!j||typeof j!=='object')throw new Error('format non reconnu');
   if(j.app==='reperage-guide'){closeModal();return importBackup(j)}
+  if(j.format==='tiango-annuaire'){closeModal();return preImport(j)}
   if(j.format==='tiango-lieu')return lieuImport(j);
   if(j.format==='tiango-circuit')return cirImport(j);
   const gk=j.format==='tiango-visite'?'vis':j.format==='tiango-cti'?'cti':j.format==='tiango-lieu'?'reps':j.format==='tiango-circuit'?'cir':null;
@@ -1794,7 +1900,7 @@ async function importAny(text){
   if(j.format==='tiango-lieu')return lieuImport(j);
   if(j.format==='tiango-circuit')return cirImport(j);
   const it=j.format==='tiango-visite'?visIn(j):j.format==='tiango-cti'?ctiIn(j):null;
-  if(!it)throw new Error('format non reconnu : il faut une sauvegarde Tiango, un site (tiango-lieu), un circuit (tiango-circuit), un site à visiter (tiango-visite) ou un CTI (tiango-cti)');
+  if(!it)throw new Error('format non reconnu : il faut une sauvegarde Tiango, des contacts (tiango-annuaire), un site (tiango-lieu), un circuit (tiango-circuit), un site à visiter (tiango-visite) ou un CTI (tiango-cti)');
   let nl=0,r=null;
   if(it.kind==='vis'){const reps=(await live('reps')).map(fixRep).filter(x=>!x.ctiId),nm=t=>strip(t).replace(/[^a-z0-9]+/g,' ').trim(),k=nm(it.nom);
     const sid=it._sid;delete it._sid;const byId=sid&&reps.find(x=>x.id===sid);
@@ -1806,7 +1912,8 @@ async function importAny(text){
       if(!r){r={id:uid(),created:Date.now(),updated:Date.now(),d:{site:it.nom.trim(),ville:String(it.lieu||'').trim(),type:TYPES.includes(it.type)?it.type:'',pays:'France',notes:'Fiche créée par l\'import d\'un discours de visite : à compléter au repérage (horaires, tarifs, accessibilité…).'},gps:null,points:[],bud:[],np:0,nd:0,cover:''};nl=1}
       else if(!String(r.d.ville||'').trim()&&it.lieu){r.d.ville=String(it.lieu).trim();r.updated=Date.now();nl=2}
       if(r)it.lieuId=r.id}
-    await txm(['reps','items'],S=>{if(r&&nl)S('reps').put(r);S('items').put(it)})}
+    const vides=r?(await live('items')).filter(x=>x.kind==='vis'&&x.lieuId===r.id&&x.id!==it.id&&!(x.modules||[]).length).map(x=>x.id):[];   /* discours vide créé à la main : remplacé par celui de l'IA */
+    await txm(['reps','items'],S=>{if(r&&nl)S('reps').put(r);S('items').put(it);vides.forEach(i=>S('items').delete(i))});modTouch()}
   else await DB.put('items',it);
   closeModal();toast(it.kind==='vis'?`Discours importé : ${it.modules.length} modules, ${it.langs.map(l=>l.toUpperCase()).join(', ')}`+(r?(nl===1?' · nouveau site créé : '+lieuNom(r):' · site : '+lieuNom(r)):' · site à choisir')+(visIn.dup&&visIn.dup.length?' · codes en double renumérotés : '+visIn.dup.join(', '):''):`CTI importé : ${it.lignes.length} lignes`,5500);go(it.kind,it.id);
 }
@@ -1877,7 +1984,7 @@ function lieuIn(j){
   return fixRep(r)}
 async function lieuImport(j){
   const r=lieuIn(j),ex=(await live('reps')).find(x=>strip(lieuNom(x))===strip(r.d.site));
-  const go_=async()=>{await DB.put('reps',r);closeModal();toast('Site importé : '+r.d.site+' ('+r.points.length+' étapes, '+Object.keys(r.d).length+' champs renseignés)',5000);openLieu(r.id)};
+  const go_=async()=>{await DB.put('reps',r);closeModal();toast('Site importé : '+r.d.site+' ('+r.points.length+' étapes, '+Object.keys(r.d).length+' champs renseignés)',5000);openLieu(r.id);setTimeout(()=>discoursChoice(r.id,'Le site « '+r.d.site+' » est importé.'),150)};
   if(!ex)return go_();
   confirmBox('Un site de ce nom existe déjà','« '+lieuNom(ex)+' » est déjà dans vos sites. Le nouveau site sera ajouté à côté, sans toucher à l\'existant : vous pourrez comparer, puis supprimer l\'un des deux.','Importer quand même',go_)}
 async function cirImport(j){
@@ -2125,7 +2232,7 @@ async function backup(reps,name,items=[],rescue){   /* rescue : mise à l'abri d
     const ifl=[];for(const it of items){if(it.kind!=='cti')continue;for(const f of await DB.filesOf(it.id)){const {blob,...m}=f;ifl.push({...m,data:await b64(blob)});nf++}}
     parts.push('],"items":'+JSON.stringify(items)+',"ifiles":'+JSON.stringify(ifl)+'}');
     const blob=new Blob(parts,{type:'application/json'});
-    if(await deliver(blob,name)){if(!rescue)await DB.put('kv',{t:Date.now(),reps:reps.length,items:items.length,files:nf,size:blob.size},'lastBackup')}
+    if(await deliver(blob,name)){if(!rescue)await DB.put('kv',{t:Date.now(),reps:reps.length,items:items.length,files:nf,size:blob.size},'lastBackup');bkRefresh();toast('Sauvegarde remise : '+name,4000)}
     else toast('Sauvegarde annulée : aucun fichier n\'a été remis',4000)}
   catch(e){toast('Sauvegarde impossible : '+((e&&e.message)||'mémoire insuffisante ? Sauvegardez les repérages un par un.'),7000)}
 }
@@ -2191,6 +2298,8 @@ async function trashSheet(){
 }
 
 /* ---------- Menu ---------- */
+async function doBackup(){closeModal();backup(await live('reps'),'tiango_'+today()+'.tiango.json',await live('items'))}
+$('#bBk').onclick=doBackup;
 $('#bMenu').onclick=async()=>{
   const lb=await DB.get('kv','lastBackup'),n=(await live('reps')).length+(await live('items')).length,nt=(await trashList()).length;
   let use='',pers=null,off=false;
@@ -2201,7 +2310,7 @@ $('#bMenu').onclick=async()=>{
   $('#modal').innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="Menu"><div class="sheet"><picture><source srcset="logo-dark.png" media="(prefers-color-scheme:dark)"><img class="brand" src="logo.png" alt="Tiango" style="width:220px;padding:6px 12px"></picture>
    <div style="display:grid;gap:10px;margin-top:12px">
    <button class="btn sec" id="m1">👤 Mon profil</button>
-   <button class="btn sec" id="m2"${n?'':' disabled'}>💾 Sauvegarder toutes mes données</button>
+   <button class="btn sec" id="m2">💾 Sauvegarder toutes mes données</button>
    <button class="btn sec" id="m3">📥 Importer (sauvegarde, site à visiter ou CTI)</button>
    <button class="btn sec" id="m7">🔑 Licence${LIC.state==='valide'?' : '+esc(LIC.nom):' (démonstration)'}</button>
    <button class="btn sec" id="m8">🎙️ Discours de visite (tous)</button>
@@ -2215,7 +2324,7 @@ $('#bMenu').onclick=async()=>{
    <div class="row" style="margin-top:10px"><button class="btn grow" id="mNo">Fermer</button></div></div></div>`;
   imgGuard();
   $('#mNo').onclick=closeModal;$('#m1').onclick=editProfil;
-  $('#m2').onclick=async()=>{closeModal();backup(await live('reps'),'tiango_'+today()+'.tiango.json',await live('items'))};
+  $('#m2').onclick=doBackup;
   $('#m3').onclick=()=>importSheet();
   $('#m4').onclick=()=>{closeModal();go('syn')};$('#m7').onclick=()=>licSheet();$('#m8').onclick=()=>{closeModal();go('visList')};
   $('#m5').onclick=()=>trashSheet();
@@ -2234,5 +2343,5 @@ $('#bMenu').onclick=async()=>{
     if(m.data==='here')toast('Tiango est déjà ouvert dans un autre onglet. Fermez-en un pour éviter d\'écraser vos saisies.',9000)};bc.postMessage('hello')}catch(e){}
   /* vidage automatique de la corbeille après 30 jours */
   try{const lim=Date.now()-TRASH_DAYS*864e5;for(const r of await DB.all('reps'))if(r.deleted&&r.deleted<lim)await purge(r);for(const i of await DB.all('items'))if(i.deleted&&i.deleted<lim)await purgeItem(i)}catch(e){}
-  await licInit();mark('ok');go('list');
+  await licInit();await profilSync();mark('ok');bkRefresh();go('list');
 })();
