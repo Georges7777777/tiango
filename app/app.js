@@ -130,7 +130,7 @@ function fixRep(r){r.d=obj(r.d);r.gps=gpsOK(r.gps);r.updated=+r.updated||0;r.cre
   if(r.ctiId&&!okId(r.ctiId))delete r.ctiId;
   r.bud=arr(r.bud).filter(x=>x&&typeof x==='object');r.bud.forEach(l=>{if(!okId(l.id))l.id=uid()});return r}
 function fixItem(i){i.updated=+i.updated||0;const A=k=>{i[k]=arr(i[k]).filter(x=>x&&typeof x==='object')};
-  if(i.kind==='cti'){['lignes','pieces','apres'].forEach(A);i.h=obj(i.h);A('contacts');i.contacts.forEach(c=>{if(!okId(c.id))c.id=uid();if(!okId(c.presId))c.presId=''});if(!okId(i.circId))i.circId='';i.lignes.forEach(l=>{if(!okId(l.id))l.id=uid();l.gps=gpsOK(l.gps);if(!okId(l.repId))l.repId='';if(!okId(l.visId))l.visId='';if(!okId(l.fId))l.fId=''});A('accs');i.accs.forEach(a=>{if(!okId(a.id))a.id=uid();if(!okId(a.presId))a.presId=''});if(!okId(i.repId))i.repId=''}
+  if(i.kind==='cti'){['lignes','pieces','apres'].forEach(A);i.h=obj(i.h);A('contacts');i.contacts.forEach(c=>{if(!okId(c.id))c.id=uid();if(!okId(c.presId))c.presId=''});if(!okId(i.circId))i.circId='';i.lignes.forEach(l=>{if(!okId(l.id))l.id=uid();l.gps=gpsOK(l.gps);if(!okId(l.repId))l.repId='';if(!okId(l.visId))l.visId='';if(!okId(l.fId))l.fId='';l.modCode=typeof l.modCode==='string'?l.modCode:'';l.grp=okId(l.grp)?l.grp:''});A('accs');i.accs.forEach(a=>{if(!okId(a.id))a.id=uid();if(!okId(a.presId))a.presId=''});if(!okId(i.repId))i.repId=''}
   if(i.kind==='vis'){if(!okId(i.lieuId))i.lieuId='';['modules','formules','faq','anec','planb','nepas','gloss','sources','conf','fiche'].forEach(A);i.secu=obj(i.secu);
     i.langs=arr(i.langs).map(l=>String(l).toLowerCase()).filter(l=>/^[a-z]{2,3}(-[a-z0-9]{2,4})?$/.test(l));if(!i.langs.length)i.langs=['fr'];
     i.modules.forEach(m=>{m.titre=obj(m.titre);m.texte=obj(m.texte)});i.formules.forEach((f,n)=>{if(!okId(f.id))f.id='f'+n+'-'+String(i.id||'').slice(-8)})}
@@ -650,6 +650,23 @@ VIEWS.preview={get back(){return pv.back},t:()=>esc(pv.title)+sub2('Aperçu avan
 }};
 /* ================= ESPACE CTI : cadre technique d'itinéraire ================= */
 const LT={pec:['Prise en charge','Prise en charge'],trajet:['Trajet','Déplacement + commentaire à bord'],arret:['Arrêt','Arrêt commenté'],pause:['Pause','Pause'],repas:['Repas','Repas'],libre:['Temps libre','Temps libre'],fin:['Fin de prestation','Fin de prestation / passage de témoin']};
+/* Détail d'un arrêt : un site visité avec plusieurs modules (stations, pause, repas) devient une ligne par module dans le CTI */
+const ctiSteps=(v,fo)=>v?(fo?fSeq(v,fo):v.modules.filter(m=>m.type!=='extension')):[];
+function ctiSubs(l,v){
+  const fo=l.fId&&v?v.formules.find(f=>f.id===l.fId):null,S=ctiSteps(v,fo),g=l.grp||l.id;
+  return S.map((m,k)=>{
+    const ty=m.type==='repas'?'repas':m.type==='pause'?'pause':'arret',nom=(m.lieu||m.code||'').trim();
+    const s={id:uid(),type:ty,nature:LT[ty][1],lieu:ty==='arret'?[l.lieu,nom].filter(Boolean).join(' — '):(nom||LT[ty][0]),duree:String(num(m.duree)||''),repId:l.repId||'',visId:v.id,fId:fo?fo.id:'',modCode:(m.code||'').trim(),grp:g};
+    if(k===0){Object.keys(l).forEach(x=>{if(!(x in s)&&x!=='orig')s[x]=l[x]});s.orig=JSON.parse(JSON.stringify(Object.assign({},l,{orig:undefined})))}
+    return s})}
+const ctiCanDetail=(l,v)=>!!v&&l.type==='arret'&&!l.modCode&&ctiSubs(l,v).filter(s=>num(s.duree)>0).length>=2;
+function ctiDetail(c,i,v){const l=c.lignes[i];if(!ctiCanDetail(l,v))return false;c.lignes.splice(i,1,...ctiSubs(l,v));return true}
+function ctiRegroup(c,g){
+  const ix=c.lignes.map((l,i)=>l.grp===g?i:-1).filter(i=>i>=0);if(!ix.length)return false;
+  const f=c.lignes[ix[0]],o=f.orig;
+  const base=o?Object.assign({},o,{id:g}):{id:g,type:'arret',nature:LT.arret[1],lieu:String(f.lieu||'').split(' — ')[0],duree:String(ix.reduce((a,k)=>a+num(c.lignes[k].duree),0)||''),repId:f.repId||'',visId:f.visId||'',fId:f.fId||''};
+  delete base.orig;base.modCode='';base.grp='';if(blank(base.duree))base.duree=String(ix.reduce((a,k)=>a+num(c.lignes[k].duree),0)||'');
+  c.lignes.splice(ix[0],ix.length,base);return true}
 const CTI_ID=[['titre','Intitulé de la prestation','text','wide'],['sous','Précision (ex. Jour 2 matin)','text'],['date','Date','date'],['debut','Heure de début','time'],['fin','Heure de fin imposée','time'],['note','Version / état du document','text','wide']];
 const CTI_H=[['guide','Guide accompagnateur','text'],['prestation','Prestation (périmètre, durée)','textarea'],['clients','Clients (typologie)','textarea'],['effectif','Effectif','text'],
  ['transport','Moyen de transport','textarea'],['pec','Prise en charge (heure, lieu exact)','text'],['finlieu','Fin de prestation / passage de témoin','text'],
@@ -727,6 +744,9 @@ VIEWS.cti={item:1,back:'ctiList',t:()=>esc(item.titre||'Nouveau CTI')+sub2('Cadr
   bindFields($('#cId'),c,e=>{saveItem();bilan();if(e&&e.dataset.k==='titre')$('#ttl').firstChild.textContent=e.value||'Nouveau CTI'});
   bindFields($('#cH'),c.h,()=>saveItem());
   const opt=(L,v,lab)=>`<option value="">—</option>`+L.map(x=>`<option value="${esc(x.id)}"${x.id===v?' selected':''}>${esc(lab(x))}</option>`).join('');
+  const detBtns=l=>{const v=vis.find(x=>x.id===l.visId);
+    if(l.grp)return `<div class="row" style="margin-top:8px"><button type="button" class="btn sec sm" data-reg="${esc(l.grp)}">↩ Regrouper les étapes de ce site en une seule ligne</button></div>`;
+    return ctiCanDetail(l,v)?`<div class="row" style="margin-top:8px"><button type="button" class="btn sec sm" data-det="${esc(l.id)}">🔎 Détailler les étapes (${ctiSubs(l,v).length}) : stations, pause, repas</button></div>`:''};
   editList($('#cL'),c.lignes,[['type','Nature de la ligne','select',Object.entries(LT).map(([k,v])=>[k,v[0]])],['lieu','Étape / lieu','text'],['duree','Durée (minutes)','number'],['km','Kilomètres de l\'étape','dec'],['imp','Horaire','select',[['Impératif','Impératif : ne pas décaler (réservation, billet, bateau, retour imposé)']]],['hfix','Heure impérative (début de l\'étape)','time'],
      ['a_dep','Plan : dépose','text'],['a_park','Plan : stationnement','text'],['a_ent','Plan : entrée','text'],['a_rdv','Plan : rendez-vous','text'],
      ['conf','Confirmation','select',['À confirmer','Confirmé','Annulé']],['bon','Bon d\'échange / n° de réservation','text'],['lim','Date limite de confirmation ou d\'annulation','date'],['eff','Effectif à cette étape (vide = identique à l\'étape précédente)','number'],['conv','Consignes convenues avec le prestataire','textarea'],
@@ -737,13 +757,16 @@ VIEWS.cti={item:1,back:'ctiList',t:()=>esc(item.titre||'Nouveau CTI')+sub2('Cadr
      intro:'Alternez trajets et arrêts. Ce qui ne peut être confirmé que sur place se note dans « À vérifier sur place » : ces cases ressortent en jaune dans le document et alimentent le repérage.',
      extra:l=>`<div class="row" style="margin-top:10px"><span class="hr"></span>${!blank(l.prevu)&&num(l.prevu)!==num(l.duree)?`<span class="hr t">prévu ${num(l.prevu)} min · relevé ${num(l.duree)} min${l.releve?' le '+frDate(l.releve):''}</span>`:''}${l.todo?'<span class="hr t" style="background:#fff2a8;color:#5c4a00">à vérifier sur place</span>':''}${l.type==='arret'||l.type==='repas'?`<span class="grow"></span>`:''}</div>
        ${(i=>blank(l.eff)&&ctiEff(c,i)?`<div class="mute" style="margin-top:6px">Effectif retenu pour cette étape : <b>${esc(ctiEff(c,i))}</b> (repris plus haut)</div>`:'')(c.lignes.indexOf(l))}
-       ${jusHTML(l)}${l.type==='trajet'||l.type==='pec'||l.type==='fin'?'':`<div class="grid"><div class="f"><label>Fiche de repérage liée</label><select data-lk="repId">${opt(reps,l.repId,r=>r.d.site||'Site sans nom')}</select></div>
+       ${jusHTML(l)}${detBtns(l)}${l.type==='trajet'||l.type==='pec'||l.type==='fin'?'':`<div class="grid"><div class="f"><label>Fiche de repérage liée</label><select data-lk="repId">${opt(reps,l.repId,r=>r.d.site||'Site sans nom')}</select></div>
        <div class="f"><label>Site à visiter lié</label><select data-lk="visId">${opt(vis,l.visId,v=>v.nom||'Site sans nom')}</select></div>
        ${(v=>v&&v.formules.length?`<div class="f"><label>Formule de visite</label><select data-lk="fId"><option value="">Discours complet</option>${v.formules.map(f=>`<option value="${esc(f.id)}"${f.id===l.fId?' selected':''}>${esc((f.nom||'Formule')+' · '+mins(fTot(v,f).d))}</option>`).join('')}</select></div>`:'')(vis.find(x=>x.id===l.visId))}</div>${l.repId?'<div class="row" style="margin-top:8px"><button class="btn sec sm" data-fill>Reprendre les remarques pratiques de la fiche</button></div>':''}`}`});
   /* les sélecteurs de type et de liens sont gérés par délégation, car la liste se redessine */
   $('#cL').addEventListener('change',e=>{const el=e.target.closest('.pt');if(!el)return;const l=c.lignes[+el.dataset.i];
     if(e.target.dataset.k==='type'){const old=Object.values(LT).map(x=>x[1]);if(!l.nature||old.includes(l.nature)){l.nature=(LT[l.type]||LT.arret)[1];const n=$('[data-k="nature"]',el);if(n)n.value=l.nature}saveItem(true)}
     if(e.target.dataset.lk){l[e.target.dataset.lk]=e.target.value;if(e.target.dataset.lk==='visId')l.fId='';if(e.target.dataset.lk==='fId'&&l.fId){const v=vis.find(x=>x.id===l.visId),f=v&&v.formules.find(x=>x.id===l.fId);if(f&&blank(l.prevu)){l.duree=String(fTot(v,f).d)}}saveItem(true);VIEWS.cti.r()}});
+  $('#cL').addEventListener('click',e=>{const bt=e.target.closest('[data-det],[data-reg]');if(!bt)return;
+    if(bt.dataset.det){const i=c.lignes.findIndex(x=>x.id===bt.dataset.det),l=c.lignes[i];if(l&&ctiDetail(c,i,vis.find(x=>x.id===l.visId))){saveItem(true);VIEWS.cti.r();toast('Étapes détaillées : indiquez l\'heure impérative du repas sur sa ligne')}}
+    else if(ctiRegroup(c,bt.dataset.reg)){saveItem(true);VIEWS.cti.r();toast('Étapes regroupées')}});
   $('#cL').addEventListener('click',e=>{if(!e.target.matches('[data-fill]'))return;const el=e.target.closest('.pt'),l=c.lignes[+el.dataset.i],r=reps.find(x=>x.id===l.repId);if(!r)return;
     const P=pratiques(r.d);
     if(!P.length)return toast('La fiche liée ne contient pas encore d\'informations pratiques');
@@ -828,7 +851,7 @@ function sameName(a,b){a=nmz(a);b=nmz(b);if(!a||!b)return false;if(a===b)return 
 const modCovers=(m,p)=>(m.ptId&&m.ptId===p.id)||sameName(m.lieu,p.nom)||sameName(m.titre&&m.titre.fr,p.nom);
 const visMiss=(v,rep)=>rep?(rep.points||[]).filter(p=>nmz(p.nom)&&!(v.modules||[]).some(m=>modCovers(m,p))):[];
 const nextMCode=v=>'M'+(Math.max(-1,...v.modules.map(m=>{const x=/^M(\d+)$/i.exec(String(m.code||'').trim());return x?+x[1]:-1}))+1);
-const MT=[['station','Station'],['pause','Pause'],['extension','Extension / variante']];
+const MT=[['station','Station'],['pause','Pause'],['repas','Repas (déjeuner, dîner)'],['extension','Extension / variante']];
 const ml=(o,l)=>(o&&(o[l]||o.fr||Object.values(o)[0]))||'';
 const modByCode=(v,code)=>v.modules.find(m=>(m.code||'').trim().toLowerCase()===code.trim().toLowerCase());
 const dupCodes=v=>{const c={};v.modules.forEach(m=>{const k=(m.code||'').trim().toLowerCase();if(k)c[k]=(c[k]||0)+1});return Object.keys(c).filter(k=>c[k]>1)};
@@ -871,7 +894,7 @@ VIEWS.vis={item:1,get back(){return visBack&&item&&visBack[1]===item.lieuId?visB
   drawMiss();
   const drawLb=()=>{const b=$('#vLb');if(!b)return;const ok=v.lieuId&&lx.some(r=>r.id===v.lieuId);b.innerHTML=(ok?'':'<div class="box warn" style="margin-top:10px">Ce discours n\'est rattaché à aucun site à visiter. Choisissez le site ci-dessus (créez-le d\'abord dans l\'onglet Sites s\'il n\'existe pas).</div>')+(ok?'<div class="row" style="margin-top:10px"><button type="button" class="btn sec sm grow" id="vLo">📍 Fiche de repérage du site</button></div>':'');
     const o=$('#vLo');if(o)o.onclick=async()=>{await saveItem(true);openLieu(v.lieuId,['vis',v.id])};
-    const nv=v.modules.filter(m=>m.type!=='pause'&&m.statut!=='Validé').length,nc=(v.conf||[]).filter(c=>!c.done&&String(c.t||'').trim()).length;
+    const nv=v.modules.filter(m=>m.type!=='pause'&&m.type!=='repas'&&m.statut!=='Validé').length,nc=(v.conf||[]).filter(c=>!c.done&&String(c.t||'').trim()).length;
     drawMiss();
     b.insertAdjacentHTML('beforeend',`<div class="box ${nv||nc?'warn':''}" style="margin-top:10px"><b class="l">Avant le départ</b>${nv?nv+' module'+(nv>1?'s':'')+' non validé'+(nv>1?'s':'')+' (statut à « Validé » après relecture et recoupement).':'Tous les modules sont validés.'}${nc?'<br>'+nc+' point'+(nc>1?'s':'')+' à confirmer (section « Points à confirmer »).':''}</div>`)};drawLb();
   $('#vId [data-k="langsTxt"]').onchange=()=>{saveItem(true);VIEWS.vis.r()};
@@ -886,7 +909,7 @@ VIEWS.vis={item:1,get back(){return visBack&&item&&visBack[1]===item.lieuId?visB
     if(!v.modules.some(m=>(m.code||'').trim()))return '<p class="mute" style="margin:10px 0 0">Aucun module pour l\'instant : créez-les d\'abord dans la section « Modules ».</p>';
     const seq=fCodes(f).map(c=>c.toLowerCase());
     return `<div class="f wide" style="margin-top:10px"><label>Modules disponibles : cochez-les dans l'ordre de la visite</label><div class="pks">${v.modules.filter(m=>(m.code||'').trim()).map(m=>{
-      const r=seq.indexOf(m.code.trim().toLowerCase()),on=r>=0,d=[m.lieu,m.type==='pause'?'pause':'',num(m.duree)?mins(num(m.duree)):''].filter(Boolean).join(' · ');
+      const r=seq.indexOf(m.code.trim().toLowerCase()),on=r>=0,d=[m.lieu,m.type==='pause'?'pause':m.type==='repas'?'repas':'',num(m.duree)?mins(num(m.duree)):''].filter(Boolean).join(' · ');
       return `<button type="button" class="pk${on?' on':''}" data-pk="${esc(m.code.trim())}" role="checkbox" aria-checked="${on}"><span class="rk">${on?r+1:''}</span><span class="pkt"><b>${esc(m.code)}</b>${d?' — '+esc(d):''}</span></button>`}).join('')}</div><p class="mute" style="margin:6px 0 0;font-size:13px">Le numéro indique la place dans la formule. Décochez pour retirer : les suivants se renumérotent.</p></div>`};
   const forExtra=f=>{const t=fTot(v,f),bad=fCodes(f).filter(c=>!modByCode(v,c));return pickBox(f)+`<div class="row" style="margin-top:10px"><span class="hr">${mins(t.d)}</span><span class="hr t">${t.n} modules</span><span class="hr t">parole ${mins(t.p)}</span></div>${bad.length?`<div class="box warn">Code${bad.length>1?'s':''} introuvable${bad.length>1?'s':''} parmi les modules : <b>${esc(bad.join(', '))}</b>. ${bad.length>1?'Ils ne sont pas comptés':'Il n\'est pas compté'} dans la durée.</div>`:''}`};
   editList($('#vFor'),v.formules,[['nom','Nom de la formule','text'],['codes','Ordre des modules (rempli par les cases ci-dessous, modifiable à la main)','text','wide'],['pour','Pour qui, dans quel cas','textarea']],
@@ -933,7 +956,7 @@ VIEWS.visPlay={item:1,get back(){return (play&&play.back)||'vis'},t:()=>esc(item
   const secu=ml(v.secu,vLang);
   $('#main').innerHTML=`<div class="play" style="--fs:${play.fs}px;padding-bottom:70px">
     <div class="row" style="margin-top:12px"><div class="seg grow">${v.langs.map(l=>`<button type="button" data-l="${esc(l)}" class="${l===vLang?'on':''}">${esc(l.toUpperCase())}</button>`).join('')}</div><button class="mini" id="pA" aria-label="Taille du texte">A±</button><button class="mini" id="pR" aria-label="Consignes, glossaire, sources">ℹ︎ Réf.</button></div>
-    <div class="row" style="margin-top:12px"><span class="hr">${play.i+1} / ${n}</span>${m.code?`<span class="hr t">${esc(m.code)}</span>`:''}${num(m.duree)?`<span class="hr t">${num(m.duree)} min sur place</span>`:''}${num(m.parole)?`<span class="hr t">parole ${num(m.parole)} min</span>`:''}${m.type!=='pause'&&m.statut&&m.statut!=='Validé'?`<span class="hr t">⚠ ${esc(m.statut)}</span>`:''}<span class="grow"></span><span class="hr t" id="pT">0:00</span></div>
+    <div class="row" style="margin-top:12px"><span class="hr">${play.i+1} / ${n}</span>${m.code?`<span class="hr t">${esc(m.code)}</span>`:''}${num(m.duree)?`<span class="hr t">${num(m.duree)} min sur place</span>`:''}${num(m.parole)?`<span class="hr t">parole ${num(m.parole)} min</span>`:''}${m.type!=='pause'&&m.type!=='repas'&&m.statut&&m.statut!=='Validé'?`<span class="hr t">⚠ ${esc(m.statut)}</span>`:''}<span class="grow"></span><span class="hr t" id="pT">0:00</span></div>
     <h2>${esc(ml(m.titre,vLang)||m.lieu||m.code||'Module')}</h2>${m.lieu&&ml(m.titre,vLang)?`<div class="mute">${esc(m.lieu)}</div>`:''}
     ${play.i===0&&secu?bx('Consignes générales à rappeler au groupe',secu,'warn'):''}${bx('Où placer le groupe',m.place)}${bx('Consigne de conduite',m.consigne,'warn cons')}${bx('Message clé',m.cle)}
     ${(m.texte||{})[vLang]?String(m.texte[vLang]).split(/\n{2,}/).map(p=>/^\s*⟨/.test(p)?`<div class="box warn cons">${esc(p.trim().replace(/^⟨|⟩$/g,''))}</div>`:`<div class="say">${esc(p)}</div>`).join(''):`<div class="empty">${m.type==='pause'?'<b>Pause</b>Annoncez l\'heure de reprise.':`<b>Pas de discours en ${esc(lname(vLang))}</b>pour ce module.`}</div>`}
@@ -1396,8 +1419,10 @@ function ctiFromDay(c,ji,L,pres,vis,o){
       lg.push({id:uid(),type:'trajet',nature:LT.trajet[1],lieu:'Vers '+lieuNom(r),duree:'',km:'',itin:r.d.a_itin||'',todo:'Temps et kilométrage de ce trajet à renseigner'});
       const fl=lieuFlags(r,{date,part:k,pax:o.pax}).filter(f=>f.lvl!=='info').map(f=>'⚠ '+f.txt),rem=[...pratiques(r.d).map(x=>x[0]+' : '+x[1]),...fl];
       const v=vis.find(x=>x.id===e.visId&&x.lieuId===r.id)||(o.vm&&r.id in o.vm?vis.find(x=>x.id===o.vm[r.id]):null)||entVis(e,vis),fo=v&&e.fId?v.formules.find(f=>f.id===e.fId):null;
-      lg.push({id:uid(),type:'arret',nature:LT.arret[1],lieu:lieuNom(r),duree:String(num(e.duree)||(fo?fTot(v,fo).d:0)||lieuDuree(r)||''),repId:r.id,visId:v?v.id:'',fId:fo?fo.id:'',contenu:r.d.c_themes||'',rem:rem.join('\n')+(e.note?'\n'+e.note:''),
-        todo:'',itin:''});
+      const arr={id:uid(),type:'arret',nature:LT.arret[1],lieu:lieuNom(r),duree:String(num(e.duree)||(fo?fTot(v,fo).d:0)||lieuDuree(r)||''),repId:r.id,visId:v?v.id:'',fId:fo?fo.id:'',contenu:r.d.c_themes||'',rem:rem.join('\n')+(e.note?'\n'+e.note:''),
+        todo:'',itin:''};
+      const sb=v&&ctiCanDetail(arr,v)?ctiSubs(arr,v):null,tot=sb?sb.reduce((n,x)=>n+num(x.duree),0):0;
+      if(sb&&(!num(e.duree)||num(e.duree)===tot))lg.push(...sb);else lg.push(arr);   /* détail automatique, sauf durée imposée différente */
       addContact({role:'Site',lieuId:r.id,note:r.d.contact||''})}
     else if(e.t==='repas'){const p=P(e.presId);lg.push({id:uid(),type:'repas',nature:LT.repas[1],lieu:(p&&p.nom)||e.note||'Repas',duree:String(num(e.duree)||60),rem:[p&&p.tel?'Tél. '+p.tel:'',e.note].filter(Boolean).join(' — ')});
       if(p)addContact({role:'Restaurant',presId:p.id,note:e.note||''})}
@@ -1759,7 +1784,7 @@ const FMT_VIS=`{
  "public": "", "fil_rouge": "", "presentation": "",
  "fiche_pratique": [{"rubrique": "Horaires", "contenu": ""}],
  "modules": [{
-   "code": "M0", "type": "station | pause | extension", "lieu": "lieu précis de l'arrêt",
+   "code": "M0", "type": "station | pause | repas | extension", "lieu": "lieu précis de l'arrêt",
    "duree_min": 10, "parole_min": 4,
    "a_voir": "", "message_cle": "", "placement_groupe": "", "consigne": "indication de conduite pour le guide, jamais prononcée",
    "titre": {"fr": "", "en": "", "es": ""},
@@ -1982,7 +2007,7 @@ function visIn(j){
   const v=NEW.vis(),s=O(j.site);
   Object.assign(v,{nom:St(s.nom||j.nom),lieu:St(s.lieu),type:St(s.type),public:St(j.public),angle:St(j.fil_rouge),resume:St(j.presentation),
     fiche:A(j.fiche_pratique).map(x=>({r:St(x.rubrique),c:St(x.contenu)})),
-    modules:A(j.modules).map(m=>({code:St(m.code),type:/pause/i.test(m.type)?'pause':/ext/i.test(m.type)?'extension':'station',lieu:St(m.lieu),duree:St(m.duree_min),parole:St(m.parole_min),voir:St(m.a_voir),cle:St(m.message_cle),place:St(m.placement_groupe),consigne:St(m.consigne),titre:MLO(m.titre),texte:MLO(m.discours),statut:St(m.statut),valide:St(m.valide_par),src:St(m.source)})),
+    modules:A(j.modules).map(m=>({code:St(m.code),type:/pause/i.test(m.type)?'pause':/repas|d[ée]jeuner|d[iî]ner/i.test(m.type)?'repas':/ext/i.test(m.type)?'extension':'station',lieu:St(m.lieu),duree:St(m.duree_min),parole:St(m.parole_min),voir:St(m.a_voir),cle:St(m.message_cle),place:St(m.placement_groupe),consigne:St(m.consigne),titre:MLO(m.titre),texte:MLO(m.discours),statut:St(m.statut),valide:St(m.valide_par),src:St(m.source)})),
     formules:A(j.formules).map(f=>({nom:St(f.nom),codes:A(f.modules).map(St).join(', ')||St(f.modules),pour:St(f.pour_qui)})),
     secu:MLO(j.securite),faq:A(j.faq).map(f=>({stat:St(f.station),q:MLO(f.question),r:MLO(f.reponse)})),
     anec:A(j.anecdotes).map(a=>({stat:St(a.station),titre:St(a.titre),statut:St(a.statut),texte:MLO(a.texte)})),
@@ -2221,7 +2246,7 @@ VIEWS.ctiRun={item:1,back:'cti',t:()=>esc(item.titre||'CTI')+sub2('Conduite de l
       ['Toilettes',[y('s_wc'),d.s_wc_d].filter(Boolean).join(' — ')],['Accès fauteuil',y('p_acc')],['Cheminement',d.p_chem],['Dernière admission',d.h_dern],['Retrait des billets',d.t_billet],['Points de vigilance',d.x_risq],['Solution de repli',d.x_planb],['Abri',y('s_abri')]].filter(x=>x[1]);
     $('#modal').innerHTML=sheetHTML(d.site||'Fiche de repérage',`<p class="mute">${esc([d.adresse,d.cp,d.ville].filter(Boolean).join(' '))}${rep.gps?` · <a href="${esc(gpsUrl(rep.gps))}" target="_blank" rel="noopener" style="color:var(--pri)">Voir sur la carte</a>`:''}${d.date?'<br>Relevé le '+esc(frDate(d.date))+' : à revérifier si la fiche est ancienne.':''}</p>`
       +(R.map(x=>bx2(x[0],esc(x[1]))).join('')||'<p class="mute">La fiche ne contient pas encore d\'informations pratiques.</p>'));$('#mNo').onclick=closeModal};
-  if(v)$('#rVis').onclick=()=>{const fo=l.fId&&v.formules.find(f=>f.id===l.fId);if(fo&&fSeq(v,fo).length&&!dupCodes(v).length){play={seq:fSeq(v,fo),i:0,nom:fo.nom||'Formule',fs:19,back:['ctiRun',c.id]};return go('visPlay',v.id)}choosePlay(v,(seq,nom)=>{play={seq,i:0,nom,fs:19,back:['ctiRun',c.id]};go('visPlay',v.id)})};
+  if(v)$('#rVis').onclick=()=>{const mo=l.modCode&&modByCode(v,l.modCode);if(mo){play={seq:[mo],i:0,nom:mo.lieu||mo.code,fs:19,back:['ctiRun',c.id]};return go('visPlay',v.id)}const fo=l.fId&&v.formules.find(f=>f.id===l.fId);if(fo&&fSeq(v,fo).length&&!dupCodes(v).length){play={seq:fSeq(v,fo),i:0,nom:fo.nom||'Formule',fs:19,back:['ctiRun',c.id]};return go('visPlay',v.id)}choosePlay(v,(seq,nom)=>{play={seq,i:0,nom,fs:19,back:['ctiRun',c.id]};go('visPlay',v.id)})};
   $('#rPb').onclick=()=>{const all=[...new Set(L.map(x=>x.visId).filter(Boolean))].map(id=>vis.find(x=>x.id===id)).filter(Boolean),src=v?[v]:all,nx=L.slice(r.i+1).find(x=>x.type!=='trajet'&&x.type!=='fin'&&!obj(r.ov[x.id]).skip);
     $('#modal').innerHTML=sheetHTML('Plan B',bx2('Solution de repli prévue',esc(c.h.meteo||''))+(rep?bx2('Repli noté au repérage',esc(rep.d.x_planb||'')):'')
       +src.map(s=>s.planb.filter(p=>p.sit||p.sol).map(p=>bx2(esc((src.length>1?s.nom+' — ':'')+(p.sit||'Situation')),esc([p.sol,p.duree&&'Durée : '+p.duree].filter(Boolean).join('\n')))).join('')).join('')
