@@ -1,6 +1,6 @@
 /* Tiango – fonctionnement hors ligne : garde une copie de l'application dans l'appareil.
    À déposer à côté de index.html. CHANGEZ LE NUMÉRO DE VERSION à chaque mise à jour d'un fichier. */
-const V = 'tiango-v20';
+const V = 'tiango-v21';
 const FILES = ['./', 'app.js', 'manifest.webmanifest', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'logo.png', 'logo-dark.png'];
 const good = r => r && r.ok && r.status === 200 && r.type === 'basic';   /* jamais de page d'erreur dans le cache */
 
