@@ -130,14 +130,14 @@ function fixRep(r){r.d=obj(r.d);r.gps=gpsOK(r.gps);r.updated=+r.updated||0;r.cre
   if(r.ctiId&&!okId(r.ctiId))delete r.ctiId;
   r.bud=arr(r.bud).filter(x=>x&&typeof x==='object');r.bud.forEach(l=>{if(!okId(l.id))l.id=uid()});return r}
 function fixItem(i){i.updated=+i.updated||0;const A=k=>{i[k]=arr(i[k]).filter(x=>x&&typeof x==='object')};
-  if(i.kind==='cti'){['lignes','pieces','apres'].forEach(A);i.h=obj(i.h);A('contacts');i.contacts.forEach(c=>{if(!okId(c.id))c.id=uid();if(!okId(c.presId))c.presId=''});if(!okId(i.circId))i.circId='';i.lignes.forEach(l=>{if(!okId(l.id))l.id=uid();l.gps=gpsOK(l.gps);if(!okId(l.repId))l.repId='';if(!okId(l.visId))l.visId=''});if(!okId(i.repId))i.repId=''}
+  if(i.kind==='cti'){['lignes','pieces','apres'].forEach(A);i.h=obj(i.h);A('contacts');i.contacts.forEach(c=>{if(!okId(c.id))c.id=uid();if(!okId(c.presId))c.presId=''});if(!okId(i.circId))i.circId='';i.lignes.forEach(l=>{if(!okId(l.id))l.id=uid();l.gps=gpsOK(l.gps);if(!okId(l.repId))l.repId='';if(!okId(l.visId))l.visId='';if(!okId(l.fId))l.fId=''});A('accs');i.accs.forEach(a=>{if(!okId(a.id))a.id=uid();if(!okId(a.presId))a.presId=''});if(!okId(i.repId))i.repId=''}
   if(i.kind==='vis'){if(!okId(i.lieuId))i.lieuId='';['modules','formules','faq','anec','planb','nepas','gloss','sources','conf','fiche'].forEach(A);i.secu=obj(i.secu);
     i.langs=arr(i.langs).map(l=>String(l).toLowerCase()).filter(l=>/^[a-z]{2,3}(-[a-z0-9]{2,4})?$/.test(l));if(!i.langs.length)i.langs=['fr'];
-    i.modules.forEach(m=>{m.titre=obj(m.titre);m.texte=obj(m.texte)})}
+    i.modules.forEach(m=>{m.titre=obj(m.titre);m.texte=obj(m.texte)});i.formules.forEach((f,n)=>{if(!okId(f.id))f.id='f'+n+'-'+String(i.id||'').slice(-8)})}
   if(i.kind==='bud'){A('lignes');if(!okId(i.ctiId))i.ctiId='';if(!okId(i.circId))i.circId=''}
   if(i.kind==='cir'){['jours','sejours','bud'].forEach(A);
-    i.jours.forEach(j=>{if(!okId(j.id))j.id=uid();if(!okId(j.sejId))j.sejId='';j.parts=obj(j.parts);
-      PARTS.forEach(([k])=>{j.parts[k]=arr(j.parts[k]).filter(x=>x&&typeof x==='object');j.parts[k].forEach(e=>{if(!okId(e.id))e.id=uid();if(!okId(e.lieuId))e.lieuId='';if(!okId(e.presId))e.presId='';if(!['lieu','libre','repas','autre'].includes(e.t))e.t='libre'})})});
+    i.jours.forEach(j=>{if(!okId(j.id))j.id=uid();if(!okId(j.sejId))j.sejId='';if(!['','prev'].includes(j.depSrc)&&!/^p:[A-Za-z0-9_-]{1,64}$/.test(String(j.depSrc||'')))j.depSrc='';j.depAdr=String(j.depAdr||'');j.finAdr=String(j.finAdr||'');j.parts=obj(j.parts);
+      PARTS.forEach(([k])=>{j.parts[k]=arr(j.parts[k]).filter(x=>x&&typeof x==='object');j.parts[k].forEach(e=>{if(!okId(e.id))e.id=uid();if(!okId(e.lieuId))e.lieuId='';if(!okId(e.presId))e.presId='';if(!okId(e.visId))e.visId='';if(!okId(e.fId))e.fId='';if(!['lieu','libre','repas','autre'].includes(e.t))e.t='libre'})})});
     i.sejours.forEach(x=>{if(!okId(x.id))x.id=uid();if(!okId(x.presId))x.presId=''});i.bud.forEach(l=>{if(!okId(l.id))l.id=uid()})}
   if(i.kind==='rpg'){A('blocs');i.blocs.forEach(b=>{if(!okId(b.id))b.id=uid();if(!okId(b.lieuId))b.lieuId='';b.d=obj(b.d);b.pts=obj(b.pts);b.gps=gpsOK(b.gps)});if(!okId(i.circId))i.circId='';i.applied=obj(i.applied)}
   return i}
@@ -278,7 +278,7 @@ async function renderList(){
   if($('#q'))$('#q').oninput=e=>draw(e.target.value.trim().toLowerCase());
   fillResume();
   $('#bNew').onclick=async()=>{if(!(await gate('reps')))return;
-    askSite(async(nom,lieu)=>{const r={id:uid(),created:Date.now(),updated:Date.now(),d:{site:nom,ville:lieu,date:today(),heure:new Date().toTimeString().slice(0,5),pays:'France'},gps:null,points:[],np:0,nd:0,cover:''};
+    askSite(async(nom,lieu)=>{const r={id:uid(),created:Date.now(),updated:Date.now(),d:{site:nom,ville:lieu,date:'',heure:'',pays:'France'},gps:null,points:[],np:0,nd:0,cover:''};
       await DB.put('reps',r);openLieu(r.id)})};
   $('#bLieuIa').onclick=()=>aiSheet('lieu');
   if($('#bProf'))$('#bProf').onclick=editProfil;
@@ -605,14 +605,14 @@ const KINDS={
   cti:{list:'ctiList',one:'CTI',ico:'🗺️',empty:'Aucun cadre technique d\'itinéraire',hint:'Créez le déroulé minuté d\'une prestation : trajets, arrêts, horaires, kilomètres.',add:'＋ Nouveau CTI',ai:true,
     title:i=>i.titre||'CTI sans titre',sub:i=>[i.sous,frDate(i.date)].filter(Boolean).join(' · '),pills:i=>[i.lignes.length+' ligne'+(i.lignes.length>1?'s':''),mins(i.lignes.reduce((a,l)=>a+num(l.duree),0))]},
   vis:{list:'visList',one:'discours',ico:'🎙️',empty:'Aucun discours de visite',hint:'Le discours se crée depuis la fiche d\'un site à visiter (onglet Sites), ou s\'importe ici : rédigé par une IA au format Tiango, il retrouve ou crée son site.',add:'＋ Nouveau discours',ai:true,
-    title:i=>i.nom||'Discours sans titre',sub:i=>i._ln||'',pills:i=>[i._ln?'':'⚠ Site à choisir',i.modules.length+' module'+(i.modules.length>1?'s':''),(i.langs||[]).map(l=>l.toUpperCase()).join(' · ')]},
+    title:i=>i.nom||'Discours sans titre',sub:i=>i._ln||'',pills:i=>[i._ln?'':'⚠ Site à choisir',i._miss?'⚠ '+i._miss+' point'+(i._miss>1?'s':'')+' sans discours':'',i.modules.length+' module'+(i.modules.length>1?'s':''),(i.langs||[]).map(l=>l.toUpperCase()).join(' · ')]},
   bud:{list:'budList',one:'budget',ico:'💶',empty:'Aucun budget',hint:'Détaillez les coûts d\'une prestation, puis fixez votre prix avec le module de marge.',add:'＋ Nouveau budget',
     title:i=>i.titre||'Budget sans titre',sub:i=>num(i.pax)?num(i.pax)+' participants payants':'',pills:i=>{const c=budCalc(i);return [eur(c.total)+' de coûts',c.prix?eur(c.prix)+' / pers.':'']}}
 };
 async function renderItems(kind){
   const K=KINDS[kind],L=(await live('items')).filter(i=>i.kind===kind).map(fixItem).sort((a,b)=>b.updated-a.updated);
   if(view!==K.list)return;
-  if(kind==='vis'){const rm=new Map((await live('reps')).map(fixRep).map(r=>[r.id,lieuNom(r)+(r.d.ville?' — '+r.d.ville:'')]));L.forEach(i=>i._ln=rm.get(i.lieuId)||'');L.sort((a,b)=>(a._ln||'~').localeCompare(b._ln||'~','fr')||(a.nom||'').localeCompare(b.nom||'','fr'))}
+  if(kind==='vis'){const rl=(await live('reps')).map(fixRep),rm=new Map(rl.map(r=>[r.id,lieuNom(r)+(r.d.ville?' — '+r.d.ville:'')]));L.forEach(i=>{i._ln=rm.get(i.lieuId)||'';i._miss=visMiss(i,rl.find(r=>r.id===i.lieuId)).length});L.sort((a,b)=>(a._ln||'~').localeCompare(b._ln||'~','fr')||(a.nom||'').localeCompare(b.nom||'','fr'))}
   $('#main').innerHTML=`<div class="row" style="margin-top:14px"><button class="btn acc grow" id="iNew">${K.add}</button></div>
    ${K.ai?`<div class="row" style="margin-top:10px"><button class="btn sec grow" id="iAi">✨ Faire rédiger par une IA</button><button class="btn sec grow" id="iImp">📥 Importer</button></div>`:''}
    ${L.length?L.map(i=>`<div class="card rep" data-id="${esc(i.id)}"><div class="th">${K.ico}</div><div class="grow"><h3>${esc(K.title(i))}</h3><div class="mute">${esc(K.sub(i))}</div>${K.pills(i).filter(Boolean).map(p=>`<span class="pill">${esc(p)}</span>`).join('')}</div></div>`).join('')
@@ -622,7 +622,7 @@ async function renderItems(kind){
   if(K.ai){$('#iAi').onclick=()=>kind==='vis'?visAiStart():aiSheet(kind);$('#iImp').onclick=()=>importSheet()}
 }
 const NEW={
-  cti:()=>({id:uid(),kind:'cti',updated:Date.now(),titre:'',sous:'',date:today(),debut:'09:00',fin:'',note:'',h:{guide:[profil.prenom,profil.nom].filter(Boolean).join(' '),urgences:'15 SAMU · 17 Police · 18 Pompiers · 112 · 196 CROSS (urgence en mer) · 114 (SMS, personnes sourdes et malentendantes)'},lignes:[],pieces:[],apres:[],repId:'',contacts:[],circId:'',jour:'',ed:''}),
+  cti:()=>({id:uid(),kind:'cti',updated:Date.now(),titre:'',sous:'',date:today(),debut:'09:00',fin:'',note:'',h:{guide:[profil.prenom,profil.nom].filter(Boolean).join(' '),urgences:'15 SAMU · 17 Police · 18 Pompiers · 112 · 196 CROSS (urgence en mer) · 114 (SMS, personnes sourdes et malentendantes)'},lignes:[],pieces:[],apres:[],accs:[],repId:'',contacts:[],circId:'',jour:'',ed:''}),
   vis:()=>({id:uid(),kind:'vis',updated:Date.now(),nom:'',lieu:'',type:'',public:'',angle:'',resume:'',langs:['fr','en','es'],modules:[],formules:[],secu:{},faq:[],anec:[],planb:[],nepas:[],gloss:[],sources:[],conf:[],fiche:[]}),
   bud:()=>({id:uid(),kind:'bud',updated:Date.now(),titre:'',pax:'20',acc:'1',ctiId:'',lignes:[],base:'pv',t1:'15',t2:'25',t3:'35',prix:'',arr:'1'})
 };
@@ -654,6 +654,8 @@ const CTI_ID=[['titre','Intitulé de la prestation','text','wide'],['sous','Pré
 const CTI_H=[['guide','Guide accompagnateur','text'],['prestation','Prestation (périmètre, durée)','textarea'],['clients','Clients (typologie)','textarea'],['effectif','Effectif','text'],
  ['transport','Moyen de transport','textarea'],['pec','Prise en charge (heure, lieu exact)','text'],['finlieu','Fin de prestation / passage de témoin','text'],
  ['maree','Marée','text'],['soleil','Lever et coucher du soleil','text'],['meteo','Météo et solution de repli','text'],['contacts','Contacts utiles','textarea'],['urgences','Urgences','textarea']];
+/* effectif d'une étape : celui saisi sur l'étape, sinon le dernier connu plus haut, sinon l'effectif de l'en-tête */
+function ctiEff(c,i){for(let k=i;k>=0;k--){const l=c.lignes[k];if(l&&!blank(l.eff))return String(l.eff).trim()}const m=/\d+/.exec(String(c.h.effectif||''));return m?m[0]:''}
 const hm=m=>{m=((Math.round(m)%1440)+1440)%1440;return Math.floor(m/60)+'h'+String(m%60).padStart(2,'0')};
 const t2m=s=>{const [h,m]=String(s||'').split(':');return (+h||0)*60+(+m||0)};
 /* attente avant un horaire impératif : si l'on arrive en avance, l'étape ne commence qu'à l'heure fixée */
@@ -690,7 +692,7 @@ function ctiCheck(c){const out=[],A=(lvl,t)=>out.push({lvl,txt:t}),now=Date.now(
   if(k.wait>=20)A('att','Attente cumulée de '+mins(k.wait)+' avant des horaires impératifs : à utiliser (temps libre) ou à déplacer');
   const tv=c.lignes.filter(l=>l.todo&&blank(l.obs)).length;if(tv)A('att',tv+' point'+(tv>1?'s':'')+' à vérifier sur place, sans constat du repérage');
   c.lignes.forEach(l=>{const n=lab(l);if(!(l.imp||l.bon||l.conf||l.lim||l.type==='repas'))return;
-    if(l.type==='repas'||l.imp){if(!l.conf)A('att',n+' : confirmation non renseignée');if(!l.bon)A('att',n+' : bon d\'échange ou n° de réservation manquant');if(blank(l.eff)&&!c.h.effectif)A('att',n+' : effectif attendu non précisé')}
+    if(l.type==='repas'||l.imp){if(!l.conf)A('att',n+' : confirmation non renseignée');if(!l.bon)A('att',n+' : bon d\'échange ou n° de réservation manquant');if(!ctiEff(c,c.lignes.indexOf(l)))A('att',n+' : effectif attendu non précisé')}
     if(l.conf==='À confirmer')A('att',n+' : à confirmer');if(l.conf==='Annulé')A('bloc',n+' : prestation annulée, à remplacer');
     if(l.imp&&!l.hfix)A('att',n+' : horaire impératif sans heure fixée');
     if(l.lim){const j=Math.ceil((new Date(l.lim+'T23:59:59')-now)/864e5);if(j<0)A('bloc',n+' : date limite dépassée ('+frDate(l.lim)+')');else if(j<=3)A('att',n+' : date limite '+(j<=0?'aujourd\'hui':'dans '+j+' jour'+(j>1?'s':''))+' ('+frDate(l.lim)+')')}});
@@ -713,6 +715,7 @@ VIEWS.cti={item:1,back:'ctiList',t:()=>esc(item.titre||'Nouveau CTI')+sub2('Cadr
    ${sec('c_id','🧾','Prestation',`<div class="grid" id="cId">${CTI_ID.map(f=>field(f,c,'ci_')).join('')}</div>`)}
    ${sec('c_h','📋','En-tête du CTI',`<div class="grid" id="cH">${CTI_H.map(f=>field(f,c.h,'ch_')).join('')}</div><div class="row" style="margin-top:12px"><button class="btn sec sm" id="cSun">☀️ Calculer le lever et le coucher du soleil</button></div>`)}
    ${sec('c_ct','📞','Contacts : chauffeurs, guides, restaurants, sites','<div id="cCt"></div>',String(c.contacts.length))}
+   ${sec('c_ac','🧑‍🤝‍🧑','Accompagnateurs : guides, chauffeur','<div id="cAc"></div>',String(c.accs.length))}
    ${sec('c_der','⏱️','Déroulé horaire','<div id="cL"></div>',String(c.lignes.length))}
    ${sec('c_pj','📎','Pièces à joindre au dossier','<div id="cPj"></div>',String(c.pieces.length))}
    ${sec('c_hi','🗂️','Historique des réalisations','<div id="cHi"></div>',String((c.hist||[]).length))}
@@ -726,19 +729,21 @@ VIEWS.cti={item:1,back:'ctiList',t:()=>esc(item.titre||'Nouveau CTI')+sub2('Cadr
   const opt=(L,v,lab)=>`<option value="">—</option>`+L.map(x=>`<option value="${esc(x.id)}"${x.id===v?' selected':''}>${esc(lab(x))}</option>`).join('');
   editList($('#cL'),c.lignes,[['type','Nature de la ligne','select',Object.entries(LT).map(([k,v])=>[k,v[0]])],['lieu','Étape / lieu','text'],['duree','Durée (minutes)','number'],['km','Kilomètres de l\'étape','dec'],['imp','Horaire','select',[['Impératif','Impératif : ne pas décaler (réservation, billet, bateau, retour imposé)']]],['hfix','Heure impérative (début de l\'étape)','time'],
      ['a_dep','Plan : dépose','text'],['a_park','Plan : stationnement','text'],['a_ent','Plan : entrée','text'],['a_rdv','Plan : rendez-vous','text'],
-     ['conf','Confirmation','select',['À confirmer','Confirmé','Annulé']],['bon','Bon d\'échange / n° de réservation','text'],['lim','Date limite de confirmation ou d\'annulation','date'],['eff','Effectif attendu à cette étape','number'],['conv','Consignes convenues avec le prestataire','textarea'],
+     ['conf','Confirmation','select',['À confirmer','Confirmé','Annulé']],['bon','Bon d\'échange / n° de réservation','text'],['lim','Date limite de confirmation ou d\'annulation','date'],['eff','Effectif à cette étape (vide = identique à l\'étape précédente)','number'],['conv','Consignes convenues avec le prestataire','textarea'],
      ['itin','Itinéraire à suivre (voies, repères, stationnement)','textarea'],['nature','Nature du temps','text'],['contenu','Contenu / thème du commentaire','textarea'],
      ['rem','Remarques : sécurité, stationnement, WC, PMR, impératifs','textarea'],['todo','À vérifier sur place, au repérage','textarea'],['obs','Constat du repérage','textarea']],
     {add:'＋ Ajouter une ligne',blank:()=>{const last=c.lignes[c.lignes.length-1],ty=!c.lignes.length?'pec':last.type==='trajet'?'arret':'trajet';return {id:uid(),type:ty,nature:LT[ty][1],lieu:'',duree:ty==='pec'?'':'10'}},
      title:l=>(LT[l.type]||LT.arret)[0]+(l.lieu?' — '+l.lieu:''),after:bilan,
      intro:'Alternez trajets et arrêts. Ce qui ne peut être confirmé que sur place se note dans « À vérifier sur place » : ces cases ressortent en jaune dans le document et alimentent le repérage.',
      extra:l=>`<div class="row" style="margin-top:10px"><span class="hr"></span>${!blank(l.prevu)&&num(l.prevu)!==num(l.duree)?`<span class="hr t">prévu ${num(l.prevu)} min · relevé ${num(l.duree)} min${l.releve?' le '+frDate(l.releve):''}</span>`:''}${l.todo?'<span class="hr t" style="background:#fff2a8;color:#5c4a00">à vérifier sur place</span>':''}${l.type==='arret'||l.type==='repas'?`<span class="grow"></span>`:''}</div>
-       ${l.type==='trajet'||l.type==='pec'||l.type==='fin'?'':`${jusHTML(l)}<div class="grid"><div class="f"><label>Fiche de repérage liée</label><select data-lk="repId">${opt(reps,l.repId,r=>r.d.site||'Site sans nom')}</select></div>
-       <div class="f"><label>Site à visiter lié</label><select data-lk="visId">${opt(vis,l.visId,v=>v.nom||'Site sans nom')}</select></div></div>${l.repId?'<div class="row" style="margin-top:8px"><button class="btn sec sm" data-fill>Reprendre les remarques pratiques de la fiche</button></div>':''}`}`});
+       ${(i=>blank(l.eff)&&ctiEff(c,i)?`<div class="mute" style="margin-top:6px">Effectif retenu pour cette étape : <b>${esc(ctiEff(c,i))}</b> (repris plus haut)</div>`:'')(c.lignes.indexOf(l))}
+       ${jusHTML(l)}${l.type==='trajet'||l.type==='pec'||l.type==='fin'?'':`<div class="grid"><div class="f"><label>Fiche de repérage liée</label><select data-lk="repId">${opt(reps,l.repId,r=>r.d.site||'Site sans nom')}</select></div>
+       <div class="f"><label>Site à visiter lié</label><select data-lk="visId">${opt(vis,l.visId,v=>v.nom||'Site sans nom')}</select></div>
+       ${(v=>v&&v.formules.length?`<div class="f"><label>Formule de visite</label><select data-lk="fId"><option value="">Discours complet</option>${v.formules.map(f=>`<option value="${esc(f.id)}"${f.id===l.fId?' selected':''}>${esc((f.nom||'Formule')+' · '+mins(fTot(v,f).d))}</option>`).join('')}</select></div>`:'')(vis.find(x=>x.id===l.visId))}</div>${l.repId?'<div class="row" style="margin-top:8px"><button class="btn sec sm" data-fill>Reprendre les remarques pratiques de la fiche</button></div>':''}`}`});
   /* les sélecteurs de type et de liens sont gérés par délégation, car la liste se redessine */
   $('#cL').addEventListener('change',e=>{const el=e.target.closest('.pt');if(!el)return;const l=c.lignes[+el.dataset.i];
     if(e.target.dataset.k==='type'){const old=Object.values(LT).map(x=>x[1]);if(!l.nature||old.includes(l.nature)){l.nature=(LT[l.type]||LT.arret)[1];const n=$('[data-k="nature"]',el);if(n)n.value=l.nature}saveItem(true)}
-    if(e.target.dataset.lk){l[e.target.dataset.lk]=e.target.value;saveItem(true);VIEWS.cti.r()}});
+    if(e.target.dataset.lk){l[e.target.dataset.lk]=e.target.value;if(e.target.dataset.lk==='visId')l.fId='';if(e.target.dataset.lk==='fId'&&l.fId){const v=vis.find(x=>x.id===l.visId),f=v&&v.formules.find(x=>x.id===l.fId);if(f&&blank(l.prevu)){l.duree=String(fTot(v,f).d)}}saveItem(true);VIEWS.cti.r()}});
   $('#cL').addEventListener('click',e=>{if(!e.target.matches('[data-fill]'))return;const el=e.target.closest('.pt'),l=c.lignes[+el.dataset.i],r=reps.find(x=>x.id===l.repId);if(!r)return;
     const P=pratiques(r.d);
     if(!P.length)return toast('La fiche liée ne contient pas encore d\'informations pratiques');
@@ -748,6 +753,9 @@ VIEWS.cti={item:1,back:'ctiList',t:()=>esc(item.titre||'Nouveau CTI')+sub2('Cadr
   checkList($('#cPj'),c.pieces,{ph:'Carte, plan, horaires de marée, fiches…',after:()=>setCnt('c_pj',String(c.pieces.length))});
   checkList($('#cAp'),c.apres,{ph:'Chronos réels, noms des voies, parkings…',after:()=>setCnt('c_ap',String(c.apres.length))});
   drawContacts(c,pres,reps,sibs);
+  editList($('#cAc'),c.accs,[['role','Fonction','select',['Guide principal','Second guide','Chauffeur','Autre accompagnateur']],['presId','Fiche de l\'annuaire (facultatif)','select',pres.filter(p=>['Chauffeur','Autocariste','Guide local','Guide-conférencier'].includes(p.role)).map(p=>[p.id,(p.nom||'Sans nom')+' · '+p.role])],['nom','Nom (saisie libre possible)','text'],['tel','Téléphone','tel']],
+    {add:'＋ Ajouter un accompagnateur',blank:()=>({id:uid(),role:c.accs.length?'Second guide':'Guide principal',presId:'',nom:'',tel:''}),title:a=>(a.role||'Accompagnateur')+(accNom(a,pres)?' — '+accNom(a,pres):''),after:()=>setCnt('c_ac',String(c.accs.length)),
+     intro:'Le groupe est accompagné par le guide, éventuellement un second guide, et le chauffeur du car, qui compte aussi comme accompagnateur. Le nom peut être saisi librement.'});
   bilan();
   if($('#cCir'))$('#cCir').onclick=()=>go('cir',c.circId);
   $('#cRun').onclick=()=>go('ctiRun');
@@ -791,10 +799,13 @@ VIEWS.cti={item:1,back:'ctiList',t:()=>esc(item.titre||'Nouveau CTI')+sub2('Cadr
         if(x.o!==null)x.l.obs=x.o;if(x.gps)x.l.gps=x.gps});
       closeModal();if(!n)return;await saveItem(true);await VIEWS.cti.r();toast(n+' ligne(s) mise(s) à jour')}};
 }};
+const accNom=(a,pres)=>{const p=a.presId&&pres.find(x=>x.id===a.presId);return a.nom||(p&&p.nom)||''};
+const accTel=(a,pres)=>{const p=a.presId&&pres.find(x=>x.id===a.presId);return a.tel||(p&&[p.tel,p.tel2].filter(Boolean).join(' / '))||''};
 function ctiModel(c,x={}){
   const k=ctiCalc(c),B=[{h1:'Cadre technique d\'itinéraire'},{meta:[c.titre,c.sous,c.date&&new Date(c.date+'T12:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}),c.lignes.length&&hm(t2m(c.debut))+' → '+hm(k.end)].filter(Boolean).join(' — ')}];
   if(c.note)B.push({small:c.note});
   const H=CTI_H.map(f=>[f[1],String(c.h[f[0]]??'').trim()]).filter(x=>x[1]);if(H.length)B.push({table:H});
+  if(c.accs.length)B.push({h2:'Accompagnateurs ('+c.accs.length+')'},{grid:{w:[2600,5400,3600],head:['Fonction','Nom','Téléphone'],rows:c.accs.map(a=>[a.role||'',accNom(a,x.pres||[])||'à préciser',accTel(a,x.pres||[])])}});
   const CT=c.contacts.map(ct=>{const I=contactInfo(ct,x.pres||[],x.reps||[]);return [ct.role||'',I.nom+(I.det?'\n'+I.det:''),I.tel,ct.note||'']});
   if(CT.length)B.push({h2:'Contacts'},{grid:{w:[1800,4200,2600,4400],head:['Rôle','Nom','Téléphone','Remarque'],rows:CT}});
   const FL=ctiFlags(c,x.reps||[]);if(FL.length)B.push({h2:'Contraintes des sites à traiter'},{grid:{w:[1600,3000,3000,6400],head:['Niveau','Lieu','Contrainte','Détail'],rows:FL.map(a=>[{t:lvlName[a.lvl],b:a.lvl==='bloc',fill:a.lvl==='bloc'?'F8D7D0':'FFF2A8'},a.lieu,a.short,a.txt])}});
@@ -804,13 +815,18 @@ function ctiModel(c,x={}){
       {t:[l.rem,l.obs&&'Constat du repérage : '+l.obs,l.todo&&'À VÉRIFIER SUR PLACE : '+l.todo].filter(Boolean).join('\n'),fill:l.todo?'FFF2A8':undefined}])}},{p:'Bilan temps : '+ctiBilan(k)+'.'})}
   const DJ=c.lignes.map((l,i)=>({l,i})).filter(({l})=>(l.docs&&l.docs.length)||l.imp||l.bon||l.conf||l.lim||l.eff||l.conv||l.a_dep||l.a_park||l.a_ent||l.a_rdv);
   if(DJ.length)B.push({h2:'Dossier du jour et plan d\'accès'},{grid:{w:[1100,2300,1500,2100,1800,2200,3400],head:['Horaire','Étape','Horaire impératif','Confirmation / bon','Effectif / date limite','Plan : dépose · stationnement · entrée · rendez-vous','Consignes convenues'],
-    rows:DJ.map(({l,i})=>[{t:k.rows[i].hor,b:1},lab(l),l.imp?{t:'IMPÉRATIF'+(l.hfix?' '+hm(t2m(l.hfix)):''),b:1,fill:'F8D7D0'}:'souple',[l.conf,l.bon,...(l.docs||[]).map(d=>'Justificatif : '+d.name)].filter(Boolean).join('\n'),[l.eff&&'Attendu : '+l.eff,l.lim&&'Limite : '+frDate(l.lim)].filter(Boolean).join('\n'),[l.a_dep&&'Dépose : '+l.a_dep,l.a_park&&'Stationnement : '+l.a_park,l.a_ent&&'Entrée : '+l.a_ent,l.a_rdv&&'Rendez-vous : '+l.a_rdv].filter(Boolean).join('\n'),l.conv||''])}});
+    rows:DJ.map(({l,i})=>[{t:k.rows[i].hor,b:1},lab(l),l.imp?{t:'IMPÉRATIF'+(l.hfix?' '+hm(t2m(l.hfix)):''),b:1,fill:'F8D7D0'}:'souple',[l.conf,l.bon,...(l.docs||[]).map(d=>'Justificatif : '+d.name)].filter(Boolean).join('\n'),[ctiEff(c,i)&&'Attendu : '+ctiEff(c,i),l.lim&&'Limite : '+frDate(l.lim)].filter(Boolean).join('\n'),[l.a_dep&&'Dépose : '+l.a_dep,l.a_park&&'Stationnement : '+l.a_park,l.a_ent&&'Entrée : '+l.a_ent,l.a_rdv&&'Rendez-vous : '+l.a_rdv].filter(Boolean).join('\n'),l.conv||''])}});
   if(checksTxt(c.pieces))B.push({h2:'Pièces à joindre au dossier d\'accompagnement'},{p:checksTxt(c.pieces)});
   if(checksTxt(c.apres))B.push({h2:'À compléter après le repérage'},{p:checksTxt(c.apres)});
   B.push({small:'Document établi avec Tiango – tiango.fr'});return B;
 }
 /* ================= DISCOURS DE VISITE d'un site à visiter : station par station, multilingue ================= */
 let vLang='fr', play=null, playT=null, visBack=null;
+/* un point du site est couvert par un module qui porte son nom (tous types : station, pause, extension) ou qui lui a été relié */
+const nmz=t=>strip(t).replace(/[^a-z0-9]+/g,' ').trim();
+function sameName(a,b){a=nmz(a);b=nmz(b);if(!a||!b)return false;if(a===b)return true;const [c,l]=a.length<b.length?[a,b]:[b,a];return l.includes(c)&&c.split(' ').length>=3&&c.length/l.length>=.6}
+const modCovers=(m,p)=>(m.ptId&&m.ptId===p.id)||sameName(m.lieu,p.nom)||sameName(m.titre&&m.titre.fr,p.nom);
+const visMiss=(v,rep)=>rep?(rep.points||[]).filter(p=>nmz(p.nom)&&!(v.modules||[]).some(m=>modCovers(m,p))):[];
 const nextMCode=v=>'M'+(Math.max(-1,...v.modules.map(m=>{const x=/^M(\d+)$/i.exec(String(m.code||'').trim());return x?+x[1]:-1}))+1);
 const MT=[['station','Station'],['pause','Pause'],['extension','Extension / variante']];
 const ml=(o,l)=>(o&&(o[l]||o.fr||Object.values(o)[0]))||'';
@@ -829,6 +845,7 @@ VIEWS.vis={item:1,get back(){return visBack&&item&&visBack[1]===item.lieuId?visB
     <div class="row" style="margin-top:10px"><button class="btn sec grow" id="vAi">✨ Faire rédiger par une IA</button><button class="btn sec grow" id="vImp">📥 Importer</button></div>
     <div class="row" style="margin-top:10px"><button class="btn sec grow" id="vExp">⬆ Exporter au format Tiango</button></div>
     <div class="f"><label>Langue affichée pour les textes</label><div class="seg" id="vLg">${v.langs.map(l=>`<button type="button" data-l="${esc(l)}" class="${l===vLang?'on':''}">${esc(lname(l))}</button>`).join('')}</div></div></div>
+   <div id="vMissTop"></div>
    ${sec('v_id','🏛️','Identité du discours',`<div class="grid" id="vId">${[['lieuId','Site à visiter (fiche de repérage) — obligatoire','select',lx.map(r=>[r.id,lieuNom(r)+(r.d.ville?' — '+r.d.ville:'')])],['nom','Titre du discours (ex. Visite de la cathédrale)','text','wide'],['type','Type de site','text'],['public','Public visé','text'],['langsTxt','Langues (codes séparés par des virgules : fr, en, es, de…)','text'],['angle','Fil rouge retenu','textarea'],['resume','Présentation en quelques lignes','textarea']].map(f=>field(f,{...v,langsTxt:v.langs.join(', ')},'vi_')).join('')}</div><div id="vLb"></div>`)}
    ${sec('v_mod','📍','Modules du parcours','<div id="vMod"></div>',String(v.modules.length))}
    ${sec('v_for','🧩','Formules d\'assemblage','<div id="vFor"></div>',String(v.formules.length))}
@@ -847,20 +864,22 @@ VIEWS.vis={item:1,get back(){return visBack&&item&&visBack[1]===item.lieuId?visB
     if(k==='langsTxt')v.langs=e.value.split(/[,; ]+/).map(s=>s.trim().toLowerCase()).filter(Boolean);else v[k]=e.value;
     if(k==='lieuId'){const r=lx.find(x=>x.id===e.value);v.lieu=r?String(r.d.ville||''):'';if(r&&!v.nom)v.nom=lieuNom(r);drawLb()}
     saveItem();if(k==='nom')$('#ttl').firstChild.textContent=e.value||'Nouveau discours'});
+  const drawMiss=()=>{const t=$('#vMissTop');if(!t)return;const rp=lx.find(r=>r.id===v.lieuId),miss=visMiss(v,rp);
+    t.innerHTML=miss.length?`<div class="box warn" role="alert" style="margin-top:12px"><b class="l">${miss.length} point${miss.length>1?'s':''} du site sans discours</b><div style="margin:4px 0 8px">${miss.map(p=>esc(p.nom)).join(' · ')}</div><div class="row"><button type="button" class="btn sec sm grow" id="vMiss">＋ Ajouter un module pour ${miss.length>1?'chacun':'ce point'}</button><button type="button" class="btn sec sm grow" id="vMissAi">✨ Les faire rédiger par une IA</button></div></div>`:'';
+    if(miss.length){$('#vMiss').onclick=async()=>{miss.forEach(p=>v.modules.push({code:nextMCode(v),type:'station',lieu:String(p.nom).trim(),duree:p.duree?String(p.duree):'',ptId:p.id,titre:{},texte:{}}));await saveItem(true);VIEWS.vis.r()};
+      $('#vMissAi').onclick=async()=>{await saveItem(true);aiSheet('vis',{siteId:v.lieuId})}}};
+  drawMiss();
   const drawLb=()=>{const b=$('#vLb');if(!b)return;const ok=v.lieuId&&lx.some(r=>r.id===v.lieuId);b.innerHTML=(ok?'':'<div class="box warn" style="margin-top:10px">Ce discours n\'est rattaché à aucun site à visiter. Choisissez le site ci-dessus (créez-le d\'abord dans l\'onglet Sites s\'il n\'existe pas).</div>')+(ok?'<div class="row" style="margin-top:10px"><button type="button" class="btn sec sm grow" id="vLo">📍 Fiche de repérage du site</button></div>':'');
     const o=$('#vLo');if(o)o.onclick=async()=>{await saveItem(true);openLieu(v.lieuId,['vis',v.id])};
     const nv=v.modules.filter(m=>m.type!=='pause'&&m.statut!=='Validé').length,nc=(v.conf||[]).filter(c=>!c.done&&String(c.t||'').trim()).length;
-    const rp=lx.find(r=>r.id===v.lieuId),nm=t=>strip(t).replace(/[^a-z0-9]+/g,' ').trim(),mods=v.modules.filter(m=>m.type!=='pause').map(m=>nm(m.lieu)+'|'+nm(m.titre&&m.titre.fr)),
-      miss=rp?(rp.points||[]).filter(p=>nm(p.nom)&&!mods.some(x=>{const k=nm(p.nom);return x.split('|').some(y=>y&&(y.includes(k)||k.includes(y)))})):[];
-    if(miss.length){b.insertAdjacentHTML('beforeend',`<div class="box warn" style="margin-top:10px"><b class="l">Points du site sans discours</b>${miss.map(p=>esc(p.nom)).join(' · ')}<div class="row" style="margin-top:8px"><button type="button" class="btn sec sm grow" id="vMiss">＋ Ajouter un module pour ${miss.length>1?'chacun':'ce point'}</button></div></div>`);
-      $('#vMiss').onclick=async()=>{miss.forEach(p=>v.modules.push({code:nextMCode(v),type:'station',lieu:String(p.nom).trim(),duree:p.duree?String(p.duree):'',titre:{},texte:{}}));await saveItem(true);VIEWS.vis.r()}}
+    drawMiss();
     b.insertAdjacentHTML('beforeend',`<div class="box ${nv||nc?'warn':''}" style="margin-top:10px"><b class="l">Avant le départ</b>${nv?nv+' module'+(nv>1?'s':'')+' non validé'+(nv>1?'s':'')+' (statut à « Validé » après relecture et recoupement).':'Tous les modules sont validés.'}${nc?'<br>'+nc+' point'+(nc>1?'s':'')+' à confirmer (section « Points à confirmer »).':''}</div>`)};drawLb();
   $('#vId [data-k="langsTxt"]').onchange=()=>{saveItem(true);VIEWS.vis.r()};
   $('[data-ml="secu"]').oninput=e=>{(v.secu=v.secu||{})[vLang]=e.target.value;saveItem()};
   const cnt=(k,a)=>()=>setCnt(k,String(a.length));
   editList($('#vMod'),v.modules,[['code','Code (M0, M1, P1, EXT-A…)','text'],['type','Nature','select',MT],['lieu','Lieu précis','text','wide'],['duree','Durée sur place (minutes)','number'],['parole','Temps de parole (minutes)','number'],
      ['voir','Ce que l\'on voit','textarea'],['cle','Message clé','textarea'],['place','Où placer le groupe','textarea'],['consigne','Consigne de conduite (jamais prononcée)','textarea'],['titre','Titre de la station','mlt'],['texte','Discours','ml','tall'],['statut','Statut de validation','select',['Brouillon','À recouper','Validé']],['valide','Validé par, le (nom, date)','text'],['src','Source du propos (auteur, titre, page, date de consultation)','textarea']],
-    {lang:L,add:'＋ Ajouter un module',blank:()=>({code:nextMCode(v),type:'station',titre:{},texte:{}}),title:m=>[m.code,m.lieu].filter(Boolean).join(' — '),after:cnt('v_mod',v.modules),
+    {lang:L,add:'＋ Ajouter un module',blank:()=>({code:nextMCode(v),type:'station',titre:{},texte:{}}),title:m=>[m.code,m.lieu].filter(Boolean).join(' — '),after:()=>{cnt('v_mod',v.modules)();drawMiss()},
      intro:'Chaque module est une étape autonome : un site, une durée, un message clé et le discours dans chaque langue.',
      extra:m=>{const miss=v.langs.filter(l=>!(m.texte||{})[l]),dup=dupCodes(v).includes((m.code||'').trim().toLowerCase());return (dup?`<div class="box warn" style="margin-top:8px">Le code <b>${esc(m.code)}</b> est utilisé par plusieurs modules : les formules ne retrouveraient que le premier. Donnez à chaque module un code différent.</div>`:'')+(m.type==='pause'||!miss.length?'':`<p class="mute" style="margin:8px 0 0">Discours manquant : ${miss.map(lname).join(', ')}</p>`)}});
   const pickBox=f=>{
@@ -1171,29 +1190,41 @@ async function drawUses(){
   const b=$('#usesBox');if(!b)return;const rep=cur,u=await usesOfLieu(rep.id);if(cur!==rep||!$('#usesBox'))return;
   const L=(t,a,k,lab)=>a.length?`<h3 style="margin:14px 0 6px;font-size:15px">${t}</h3>`+a.map(x=>`<div class="doc"><span class="n" role="button" tabindex="0" data-go="${k}" data-id="${esc(x.id)}">${esc(lab(x))}</span></div>`).join(''):'';
   b.innerHTML=`${u.vis.length?'':'<div class="row" style="margin-top:12px"><button class="btn acc grow" id="uSite">🎙️ Créer le discours de visite de ce site</button></div>'}<div class="row" style="margin-top:8px"><button class="btn sec grow" id="uRpg">🧭 Faire un repérage de ce site</button></div>
-   ${L('Discours de visite',u.vis,'vis',x=>x.nom||'Discours sans titre')}${L('Circuits',u.cir,'cir',x=>x.titre||'Circuit sans titre')}${L('Repérages',u.rpg,'rpg',x=>(x.titre||'Repérage')+(x.date?' · '+frDate(x.date):''))}${L('CTI',u.cti,'cti',x=>x.titre||'CTI sans titre')}
+   ${L('Discours de visite',u.vis,'vis',x=>x.nom||'Discours sans titre')}${(()=>{const n=u.vis.reduce((a,x)=>a+visMiss(fixItem(x),rep).length,0);return n?`<div class="box warn" style="margin-top:8px">⚠ ${n} point${n>1?'s':''} de ce site ${n>1?'n\'ont':'n\'a'} pas encore de discours : ouvrez le discours pour les ajouter.</div>`:''})()}${L('Circuits',u.cir,'cir',x=>x.titre||'Circuit sans titre')}${L('Repérages',u.rpg,'rpg',x=>(x.titre||'Repérage')+(x.date?' · '+frDate(x.date):''))}${L('CTI',u.cti,'cti',x=>x.titre||'CTI sans titre')}
    ${u.cir.length+u.rpg.length+u.vis.length+u.cti.length?'':'<p class="mute">Ce site n\'est encore utilisé nulle part.</p>'}`;
   const n=u.cir.length+u.rpg.length+u.vis.length+u.cti.length,c=$('[data-c="uses"]');if(c){c.textContent=n;c.classList.toggle('full',n>0)}
   $$('[data-go]',b).forEach(e=>{e.onkeydown=k=>{if(k.key==='Enter')e.click()};e.onclick=()=>{if(e.dataset.go==='vis')visBack=['edit',rep.id];go(e.dataset.go,e.dataset.id)}});
   $('#uRpg').onclick=()=>newRpg({lieuId:rep.id});const us=$('#uSite');if(us)us.onclick=()=>discoursChoice(rep.id);
 }
 /* ================= ESPACE CIRCUITS : jours, parties de journée, sites, séjours, budget ================= */
-const newJour=()=>({id:uid(),titre:'',debut:'09:00',sejId:'',parts:{matin:[],apres:[],soir:[]}});
+const newJour=()=>({id:uid(),titre:'',debut:'09:00',sejId:'',depSrc:'',depAdr:'',finAdr:'',parts:{matin:[],apres:[],soir:[]}});
 NEW.cir=()=>({id:uid(),kind:'cir',updated:Date.now(),titre:'',desc:'',pax:'20',acc:'1',depart:'',jours:[newJour()],sejours:[],bud:[]});
+/* discours et formule choisis pour un site du programme */
+const entVis=(e,V)=>{const vs=e.lieuId?V.filter(x=>x.lieuId===e.lieuId):[];return vs.find(x=>x.id===e.visId)||(vs.length===1?vs[0]:null)};
+const entForm=(e,v)=>v&&e.fId?(v.formules.find(f=>f.id===e.fId)||null):null;
+const entDuree=(e,r,V)=>{if(num(e.duree))return num(e.duree);if(e.t!=='lieu')return 0;const v=entVis(e,V),f=entForm(e,v),t=f?fTot(v,f).d:0;return t||(r?lieuDuree(r):0)};
+/* lieu de prise en charge et de fin de journée */
+const depEff=(c,ji)=>{const j=c.jours[ji];if(j.depSrc)return j.depSrc;return ji>0&&!j.depAdr&&c.jours[ji-1].sejId?'prev':''};
+const sejTxt=(c,s,pres)=>{if(!s)return '';const p=pres.find(x=>x.id===s.presId);return (p&&p.nom)||s.nom||'Hébergement'};
+function cirDep(c,ji,pres){const j=c.jours[ji],d=depEff(c,ji);
+  if(d==='prev')return sejTxt(c,c.sejours.find(s=>s.id===c.jours[ji-1].sejId),pres);
+  if(d.startsWith('p:')){const p=pres.find(x=>x.id===d.slice(2));return p?p.nom+(p.adresse?' ('+p.adresse+')':''):'(fiche supprimée)'}
+  return j.depAdr||''}
+function cirFin(c,ji,pres){const j=c.jours[ji],s=c.sejours.find(x=>x.id===j.sejId);return s?{nuit:1,txt:sejTxt(c,s,pres)}:{nuit:0,txt:j.finAdr||''}}
 const cirLieuIds=c=>{const s=new Set();c.jours.forEach(j=>PARTS.forEach(([k])=>j.parts[k].forEach(e=>{if(e.t==='lieu'&&e.lieuId)s.add(e.lieuId)})));return [...s]};
 KINDS.cir={list:'cirList',one:'circuit',ico:'🧭',empty:'Aucun circuit',hint:'Un circuit assemble des sites sur un ou plusieurs jours (matin, après-midi, soirée), avec ses séjours. Il fait remonter les contraintes des sites et sert de base aux CTI.',add:'＋ Nouveau circuit',ai:true,
-  title:i=>i.titre||'Circuit sans titre',sub:i=>[num(i.pax)?num(i.pax)+' participants':'',i.depart?'départ '+frDate(i.depart):''].filter(Boolean).join(' · '),
+  title:i=>i.titre||'Circuit sans titre',sub:i=>[num(i.pax)?'effectif de référence '+num(i.pax):''].filter(Boolean).join(' · '),
   pills:i=>[i.jours.length+' jour'+(i.jours.length>1?'s':''),cirLieuIds(i).length+' lieu'+(cirLieuIds(i).length>1?'x':'')]};
 VIEWS.cirList={top:1,t:()=>'Tiango '+sub2('Circuits'),r:()=>renderItems('cir')};
 
 /* ---------- Contraintes remontées sur le circuit ---------- */
-const dayDate=(c,ji)=>c.depart?addDays(c.depart,ji):'';
+const dayDate=(c,ji)=>c.depart?addDays(c.depart,ji):'';   /* anciens circuits seulement : le circuit est un modèle, la date appartient au CTI */
 function circAlerts(c,L){const out=[];
   c.jours.forEach((j,ji)=>PARTS.forEach(([k,lab])=>j.parts[k].forEach(e=>{if(e.t!=='lieu')return;const where=`jour ${ji+1}, ${lab.toLowerCase()}`;
     if(!e.lieuId){out.push({lvl:'att',cat:'lieu',ico:'❓',short:'Site à choisir',txt:'Une ligne « lieu » n\'a pas de lieu choisi',lieu:'',where});return}
     const r=L.get(e.lieuId);if(!r){out.push({lvl:'bloc',cat:'lieu',ico:'❓',short:'Site introuvable',txt:'Ce site a été supprimé ou n\'existe plus sur cet appareil',lieu:'(lieu introuvable)',where});return}
     lieuFlags(r,{date:dayDate(c,ji),part:k,pax:c.pax}).forEach(f=>out.push({...f,lieu:lieuNom(r),where}))})));
-  c.jours.forEach((j,ji)=>{if(ji<c.jours.length-1&&!j.sejId&&c.jours.length>1)out.push({lvl:'info',cat:'sejour',ico:'🛏️',short:'Nuit sans hébergement',txt:'Aucun séjour pour la nuit du jour '+(ji+1),lieu:'',where:'jour '+(ji+1)})});
+  c.jours.forEach((j,ji)=>{if(ji<c.jours.length-1&&!j.sejId&&!j.finAdr&&c.jours.length>1)out.push({lvl:'info',cat:'sejour',ico:'🛏️',short:'Nuit sans hébergement',txt:'Aucun séjour pour la nuit du jour '+(ji+1),lieu:'',where:'jour '+(ji+1)})});
   c.sejours.forEach(s=>{if(!c.jours.some(j=>j.sejId===s.id))out.push({lvl:'info',cat:'sejour',ico:'🛏️',short:'Séjour sans nuit',txt:'Ce séjour n\'est affecté à aucune nuit',lieu:s.nom||'',where:''})});
   return out.sort((a,b)=>LVL[a.lvl]-LVL[b.lvl])}
 /* verdict global sur un thème : ♿ accessibilité, 🚌 autocar */
@@ -1220,11 +1251,11 @@ VIEWS.cir={item:1,back:'cirList',t:()=>esc(item.titre||'Nouveau circuit')+sub2('
   const c=item,all=(await live('items')).map(fixItem),reps=(await live('reps')).map(fixRep).filter(r=>!r.ctiId).sort((a,b)=>lieuNom(a).localeCompare(lieuNom(b),'fr'));
   if(item!==c||view!=='cir')return;
   const L=new Map(reps.map(r=>[r.id,r])),pres=all.filter(i=>i.kind==='pre').sort((a,b)=>String(a.nom).localeCompare(String(b.nom),'fr')),
-    ctis=all.filter(i=>i.kind==='cti'&&i.circId===c.id),rpgs=all.filter(i=>i.kind==='rpg'&&i.circId===c.id),buds=all.filter(i=>i.kind==='bud'&&i.circId===c.id);
+    V=vis_(all),ctis=all.filter(i=>i.kind==='cti'&&i.circId===c.id),rpgs=all.filter(i=>i.kind==='rpg'&&i.circId===c.id),buds=all.filter(i=>i.kind==='bud'&&i.circId===c.id);
   if(!OPEN.has('k_init')){OPEN.add('k_init');OPEN.add(c.titre?'k_jr':'k_id')}
   $('#main').innerHTML=`<div class="card"><div id="cAl"></div>
     <div class="row" style="margin-top:12px"><button class="btn grow" id="cPv">📄 Aperçu et export</button><button class="btn sec grow" id="cRpg">🧭 Repérer ce circuit</button></div></div>
-   ${sec('k_id','🧾','Le circuit',`<div class="grid" id="kId">${[['titre','Intitulé du circuit','text','wide'],['desc','Thème, public, esprit du circuit','textarea'],['pax','Participants payants','number'],['acc','Accompagnateurs non payants (guide, chauffeur…)','number'],['depart','Date de départ envisagée (facultative : active le contrôle des jours de fermeture)','date','wide']].map(f=>field(f,c,'ck_')).join('')}</div>`)}
+   ${sec('k_id','🧾','Le circuit',`<div class="grid" id="kId">${[['titre','Intitulé du circuit','text','wide'],['desc','Thème, public, esprit du circuit','textarea'],['pax','Effectif de référence (sert au budget : chaque sortie a son effectif réel dans le CTI)','number'],['acc','Accompagnateurs prévus, non payants (guide, chauffeur…) : indication','number']].map(f=>field(f,c,'ck_')).join('')}</div>`)}
    ${sec('k_jr','📅','Jours et programme','<div id="cJ"></div>',String(c.jours.length))}
    ${sec('k_sj','🛏️','Séjours (hôtel, camping…)','<div id="cS"></div>',String(c.sejours.length))}
    ${sec('k_bd','💶','Budget du circuit','<div id="cB"></div><h3 style="margin:16px 0 0;font-size:15px">Postes propres au circuit (transport, guide, imprévus…)</h3><div id="cBL"></div><div id="cBA"></div>')}
@@ -1246,17 +1277,23 @@ VIEWS.cir={item:1,back:'cirList',t:()=>esc(item.titre||'Nouveau circuit')+sub2('
   const entryHTML=(e,ji,k,ei,len)=>{const a=`data-j="${ji}" data-p="${k}" data-e="${ei}"`;let b='';
     const ty=`<select data-ef="t" aria-label="Nature de la ligne">${[['lieu','Lieu'],['libre','Temps libre'],['repas','Repas'],['autre','Autre activité']].map(([v,l])=>`<option value="${v}"${e.t===v?' selected':''}>${l}</option>`).join('')}</select>`;
     if(e.t==='lieu'){const r=L.get(e.lieuId),fl=r?lieuFlags(r,{date:dayDate(c,ji),part:k,pax:c.pax}):[];
-      b=`<select data-ef="lieuId" aria-label="Lieu">${lieuOpts(e.lieuId)}</select><div class="grid"><div class="f"><label>Durée retenue (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}" placeholder="${r?lieuDuree(r)||'':''}"></div><div class="f"><label>Remarque</label><input data-ef="note" value="${esc(e.note||'')}"></div></div>
+      const vs=e.lieuId?V.filter(x=>x.lieuId===e.lieuId):[],ev=entVis(e,V),ef=entForm(e,ev),auto=entDuree({...e,duree:''},r,V);
+      const vSel=vs.length>1?`<div class="f"><label>Discours de visite</label><select data-ef="visId"><option value="">— choisir —</option>${vs.map(x=>`<option value="${esc(x.id)}"${ev&&ev.id===x.id?' selected':''}>${esc((x.nom||'Discours')+(x.public?' · '+x.public:''))}</option>`).join('')}</select></div>`:'',
+        fSel=ev&&ev.formules.length?`<div class="f"><label>Formule de visite${vs.length===1?' ('+esc(ev.nom||'discours')+')':''}</label><select data-ef="fId"><option value="">Discours complet${ev.modules.length?' · '+mins(ev.modules.reduce((a,m)=>a+num(m.duree),0)||0):''}</option>${ev.formules.map(f=>`<option value="${esc(f.id)}"${ef&&ef.id===f.id?' selected':''}>${esc(f.nom||'Formule')} · ${mins(fTot(ev,f).d)}</option>`).join('')}</select></div>`:'';
+      b=`<select data-ef="lieuId" aria-label="Lieu">${lieuOpts(e.lieuId)}</select><div class="grid">${vSel}${fSel}<div class="f"><label>Durée retenue (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}" placeholder="${auto||''}"></div><div class="f"><label>Remarque</label><input data-ef="note" value="${esc(e.note||'')}"></div></div>
        <div class="pills">${pills(fl)}</div>${r?'':e.lieuId?'<div class="box warn">Ce site est introuvable : restaurez-le depuis la corbeille ou choisissez-en un autre.</div>':''}`}
     else if(e.t==='repas')b=`<select data-ef="presId" aria-label="Restaurant">${presOpts('Restaurant',e.presId)}</select><div class="grid"><div class="f"><label>Prix par personne (€)</label><input data-ef="pu" type="number" inputmode="decimal" min="0" step="any" value="${esc(e.pu||'')}"></div><div class="f"><label>Durée (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}" placeholder="60"></div><div class="f wide"><label>Remarque (menu, allergies, horaire de réservation)</label><input data-ef="note" value="${esc(e.note||'')}"></div></div>`;
     else if(e.t==='autre')b=`<div class="grid"><div class="f wide"><label>Activité (spectacle, dégustation, croisière…)</label><input data-ef="note" value="${esc(e.note||'')}"></div><div class="f"><label>Durée (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}"></div><div class="f"><label>Coût, forfait groupe (€)</label><input data-ef="pu" type="number" inputmode="decimal" min="0" step="any" value="${esc(e.pu||'')}"></div></div>`;
     else b=`<div class="grid"><div class="f wide"><label>Temps libre (à quoi est-il consacré ?)</label><input data-ef="note" value="${esc(e.note||'')}" placeholder="Déjeuner libre, shopping, repos…"></div><div class="f"><label>Durée (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}"></div></div>`;
     return `<div class="en" ${a}><div class="row" style="gap:6px">${ty}<button class="mini" data-ea="up" aria-label="Monter"${ei?'':' disabled'}>↑</button><button class="mini" data-ea="dn" aria-label="Descendre"${ei<len-1?'':' disabled'}>↓</button><button class="mini" data-ea="rm" aria-label="Supprimer cette ligne">🗑</button></div>${b}</div>`};
-  const dayTot=j=>PARTS.reduce((t,[k])=>t+j.parts[k].reduce((a,e)=>a+(num(e.duree)||(e.t==='lieu'&&L.get(e.lieuId)?lieuDuree(L.get(e.lieuId)):0)),0),0);
+  const dayTot=j=>PARTS.reduce((t,[k])=>t+j.parts[k].reduce((a,e)=>a+(e.t==='lieu'?entDuree(e,L.get(e.lieuId),V):num(e.duree)),0),0);
   const drawJ=()=>{const b=$('#cJ');
     b.innerHTML=`<p class="mute" style="margin:12px 0 0">Chaque jour a trois parties. Une partie peut contenir un ou plusieurs sites, un repas, du temps libre, ou rester vide.</p>`+c.jours.map((j,ji)=>`<div class="pt jr" data-j="${ji}"><div class="hd"><span class="num">${ji+1}</span><input data-jf="titre" value="${esc(j.titre||'')}" placeholder="Jour ${ji+1} — thème (facultatif)" aria-label="Titre du jour ${ji+1}">
       <button class="mini" data-ja="up" aria-label="Monter ce jour"${ji?'':' disabled'}>↑</button><button class="mini" data-ja="dn" aria-label="Descendre ce jour"${ji<c.jours.length-1?'':' disabled'}>↓</button><button class="mini" data-ja="rm" aria-label="Supprimer ce jour">🗑</button></div>
-      <div class="grid"><div class="f"><label>Début de journée</label><input data-jf="debut" type="time" value="${esc(j.debut||'')}"></div><div class="f"><label>Nuit du jour ${ji+1}</label><select data-jf="sejId"><option value="">— aucune —</option>${c.sejours.map(s=>`<option value="${esc(s.id)}"${s.id===j.sejId?' selected':''}>${esc(sejNom(s))}</option>`).join('')}</select></div></div>
+      <div class="grid"><div class="f"><label>Heure de prise en charge du groupe</label><input data-jf="debut" type="time" value="${esc(j.debut||'')}"></div><div class="f"><label>Lieu de prise en charge</label><select data-jf="depSrc">${depOpts(ji)}</select></div>
+        ${depEff(c,ji)===''?`<div class="f wide"><label>Adresse ou description du lieu (gare, parking, adresse…)</label><input data-jf="depAdr" value="${esc(j.depAdr||'')}" placeholder="Ex. Gare de Saint-Malo, parvis"></div>`:''}
+        <div class="f"><label>Hébergement du soir (facultatif)</label><select data-jf="sejId"><option value="">— aucun —</option>${c.sejours.map(s=>`<option value="${esc(s.id)}"${s.id===j.sejId?' selected':''}>${esc(sejNom(s))}</option>`).join('')}</select></div>
+        ${j.sejId?'':`<div class="f"><label>Fin de journée : lieu de dépose</label><input data-jf="finAdr" value="${esc(j.finAdr||'')}" placeholder="Gare, parking, adresse…"></div>`}</div>
       <div class="mute" style="margin-top:4px">${c.depart?'<b>'+new Date(dayDate(c,ji)+'T12:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</b> · ':''}${dayTot(j)?'sur place : '+mins(dayTot(j)):'durées non renseignées'}</div>
       ${PARTS.map(([k,lab,ico])=>`<div class="part" data-part="${k}"><h4>${ico} ${lab}</h4>${j.parts[k].length?j.parts[k].map((e,ei)=>entryHTML(e,ji,k,ei,j.parts[k].length)).join(''):'<p class="mute" style="margin:4px 0">Rien de prévu.</p>'}
         <div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap">${[['lieu','＋ Site'],['repas','＋ Repas'],['libre','＋ Temps libre'],['autre','＋ Autre']].map(([t,l])=>`<button class="btn sec sm" data-add="${t}" data-j="${ji}" data-p="${k}">${l}</button>`).join('')}</div></div>`).join('')}</div>`).join('')
@@ -1264,15 +1301,17 @@ VIEWS.cir={item:1,back:'cirList',t:()=>esc(item.titre||'Nouveau circuit')+sub2('
     setCnt('k_jr',String(c.jours.length));
     $('#cAddJ').onclick=()=>{c.jours.push(newJour());saveItem(true);drawJ();refresh()}};
   const sejNom=s=>{const p=pres.find(x=>x.id===s.presId);return (p&&p.nom)||s.nom||'Séjour sans nom'};
+  const depOpts=ji=>{const d=depEff(c,ji),prev=ji>0?c.sejours.find(s=>s.id===c.jours[ji-1].sejId):null;
+    return `<option value=""${d===''?' selected':''}>Adresse libre</option>${prev?`<option value="prev"${d==='prev'?' selected':''}>Hébergement de la veille : ${esc(sejNom(prev))}</option>`:''}${pres.length?`<optgroup label="Annuaire">${pres.map(p=>`<option value="p:${esc(p.id)}"${d==='p:'+p.id?' selected':''}>${esc((p.nom||'Sans nom')+' · '+p.role)}</option>`).join('')}</optgroup>`:''}`};
   const J=$('#cJ'),EL=el=>{const x=el.closest('[data-j]');return x?{ji:+x.dataset.j,j:c.jours[+x.dataset.j],k:x.dataset.p,ei:x.dataset.e===undefined?-1:+x.dataset.e}:null};
   J.addEventListener('input',e=>{const t=e.target,w=EL(t);if(!w)return;
     if(t.dataset.jf&&t.tagName!=='SELECT'){w.j[t.dataset.jf]=t.value;saveItem();refresh(true)}
     if(t.dataset.ef&&t.tagName!=='SELECT'){w.j.parts[w.k][w.ei][t.dataset.ef]=t.value;saveItem();refresh(true)}});
   J.addEventListener('change',async e=>{const t=e.target,w=EL(t);if(!w)return;
-    if(t.dataset.jf==='sejId'){w.j.sejId=t.value;saveItem(true);drawJ();refresh()}
+    if(t.dataset.jf&&t.tagName==='SELECT'){w.j[t.dataset.jf]=t.value;if(t.dataset.jf==='depSrc'&&t.value)w.j.depAdr='';saveItem(true);drawJ();refresh()}
     if(t.dataset.ef){const en=w.j.parts[w.k][w.ei],f=t.dataset.ef;
       if(f==='lieuId'&&t.value==='__new'){if(!(await gate('reps'))){t.value=en.lieuId||'';return}const r={id:uid(),created:Date.now(),updated:Date.now(),d:{pays:'France',date:''},gps:null,points:[],bud:[],np:0,nd:0,cover:''};await DB.put('reps',r);en.lieuId=r.id;await saveItem(true);toast('Nouveau site créé : donnez-lui un nom');return openLieu(r.id,['cir',c.id])}
-      if(f==='t'){en.t=t.value;if(en.t==='repas'&&blank(en.duree))en.duree='60'}else en[f]=t.value;saveItem(true);drawJ();refresh()}});
+      if(f==='t'){en.t=t.value;if(en.t==='repas'&&blank(en.duree))en.duree='60'}else{en[f]=t.value;if(f==='lieuId'){en.visId='';en.fId=''}if(f==='visId')en.fId=''}saveItem(true);drawJ();refresh()}});
   J.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const w=EL(t);if(!w)return;
     if(t.dataset.add){w.j.parts[w.k].push({id:uid(),t:t.dataset.add,lieuId:'',presId:'',duree:t.dataset.add==='repas'?'60':'',note:'',pu:''});saveItem(true);drawJ();refresh();
       const last=$$(`#cJ [data-j="${w.ji}"] [data-part="${w.k}"] .en`).pop();const f=last&&$('select:not([data-ef="t"]),input',last);f&&f.focus({preventScroll:true});return}
@@ -1312,10 +1351,10 @@ VIEWS.cir={item:1,back:'cirList',t:()=>esc(item.titre||'Nouveau circuit')+sub2('
     $('#cMkC').onclick=()=>editionSheet()};
   const editionSheet=()=>{const d={ed:'',date:c.depart||today(),pax:String(c.pax||'')};
     const ids=new Set();c.jours.forEach(j=>PARTS.forEach(([k])=>(j.parts[k]||[]).forEach(e=>{if(e.t==='lieu'&&e.lieuId)ids.add(e.lieuId)})));
-    const vSites=[...ids].map(id=>{const r=L.get(id);return r?{id,nom:lieuNom(r),L:vis_(all).filter(x=>x.lieuId===id)}:null}).filter(x=>x&&x.L.length);
+    const vSites=[...ids].map(id=>{const r=L.get(id);return r?{id,nom:lieuNom(r),L:vis_(all).filter(x=>x.lieuId===id),pref:(()=>{for(const j of c.jours)for(const k of ['matin','apres','soir'])for(const e of j.parts[k])if(e.lieuId===id&&e.visId)return e.visId;return ''})()}:null}).filter(x=>x&&x.L.length);
     $('#modal').innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="Créer les CTI"><div class="sheet"><h2>Créer les CTI d'une édition</h2><p class="mute">Un CTI sera créé pour chacun des ${c.jours.length} jour(s) du circuit.</p>
       <div class="grid" id="edF">${[['ed','Nom de l\'édition (groupe, période)','text','wide'],['date','Date du premier jour','date'],['pax','Effectif','number']].map(f=>field(f,d,'ed_')).join('')}</div>
-      ${vSites.length?`<div class="f wide" style="margin-top:12px"><b>Discours de visite à lier</b><p class="mute" style="margin:4px 0 8px">Le CTI ouvrira ce discours à l'arrêt du site. Choisissez la version adaptée à ce groupe (public, langue).</p>${vSites.map(s=>`<div class="f"><label for="vm_${esc(s.id)}">${esc(s.nom)}</label><select id="vm_${esc(s.id)}" data-vm="${esc(s.id)}">${s.L.length>1?'<option value="">— choisir —</option>':''}<option value="-">Aucun discours</option>${s.L.map(x=>`<option value="${esc(x.id)}"${s.L.length===1?' selected':''}>${esc((x.nom||'Discours')+' · '+(x.langs||[]).join('/').toUpperCase()+(x.public?' · '+x.public:''))}</option>`).join('')}</select></div>`).join('')}</div>`:''}
+      ${vSites.length?`<div class="f wide" style="margin-top:12px"><b>Discours de visite à lier</b><p class="mute" style="margin:4px 0 8px">Le CTI ouvrira ce discours à l'arrêt du site. Choisissez la version adaptée à ce groupe (public, langue).</p>${vSites.map(s=>`<div class="f"><label for="vm_${esc(s.id)}">${esc(s.nom)}</label><select id="vm_${esc(s.id)}" data-vm="${esc(s.id)}">${s.L.length>1&&!s.pref?'<option value="">— choisir —</option>':''}<option value="-">Aucun discours</option>${s.L.map(x=>`<option value="${esc(x.id)}"${(s.L.length===1||x.id===s.pref)?' selected':''}>${esc((x.nom||'Discours')+' · '+(x.langs||[]).join('/').toUpperCase()+(x.public?' · '+x.public:''))}</option>`).join('')}</select></div>`).join('')}</div>`:''}
       <div class="row" style="margin-top:14px"><button class="btn sec grow" id="mNo">Annuler</button><button class="btn grow" id="mOk">Créer</button></div></div></div>`;
     bindFields($('#edF'),d);$('#mNo').onclick=closeModal;
     $('#mOk').onclick=async()=>{if(blank(d.ed))return toast('Donnez un nom à l\'édition (ex. Groupe ABC, mai 2027)');
@@ -1331,7 +1370,7 @@ VIEWS.cir={item:1,back:'cirList',t:()=>esc(item.titre||'Nouveau circuit')+sub2('
   const refresh=light=>{drawAl();drawBudget();if(!light){$$('#cS .xtra').forEach((x,i)=>{if(c.sejours[i])x.innerHTML=`<div class="mute" style="margin-top:6px">${nuits(c.sejours[i])} nuit${nuits(c.sejours[i])>1?'s':''} affectée${nuits(c.sejours[i])>1?'s':''}</div>`})}};
   bindFields($('#kId'),c,e=>{saveItem();refresh(true);if(e&&e.dataset.k==='titre')$('#ttl').firstChild.textContent=e.value||'Nouveau circuit';if(e&&e.dataset.k==='depart')drawJ()});
   drawJ();drawE();drawR();refresh();
-  $('#cPv').onclick=()=>preview({title:c.titre||'Circuit',name:'Circuit_'+slug(c.titre),blocks:cirModel(c,L,pres),landscape:true,back:'cir'});
+  $('#cPv').onclick=()=>preview({title:c.titre||'Circuit',name:'Circuit_'+slug(c.titre),blocks:cirModel(c,L,pres,V),landscape:true,back:'cir'});
   $('#cRpg').onclick=()=>newRpg({circId:c.id});
   $('#iDel').onclick=()=>delItem('ce circuit');$('#iDup').onclick=dupItem;
 }};
@@ -1344,40 +1383,43 @@ function ctiFromDay(c,ji,L,pres,vis,o){
   const j=c.jours[ji],t=NEW.cti(),P=id=>pres.find(p=>p.id===id),date=o.date?addDays(o.date,ji):'',lg=[],ct=[];
   const sejPrev=ji>0?c.sejours.find(s=>s.id===c.jours[ji-1].sejId):null,sejNow=c.sejours.find(s=>s.id===j.sejId);
   const sn=s=>{const p=s&&P(s.presId);return s?((p&&p.nom)||s.nom||''):''};
-  lg.push({id:uid(),type:'pec',nature:LT.pec[1],lieu:sejPrev?'Départ de '+sn(sejPrev):'',duree:''});
+  const dep=cirDep(c,ji,pres),fin=cirFin(c,ji,pres);
+  lg.push({id:uid(),type:'pec',nature:LT.pec[1],lieu:dep?'Prise en charge : '+dep:'',duree:''});
   const addContact=x=>{if(!ct.some(y=>(x.presId&&y.presId===x.presId)||(x.lieuId&&y.lieuId===x.lieuId)))ct.push({id:uid(),...x})};
   if(sejPrev&&sejPrev.presId)addContact({role:'Hébergement',presId:sejPrev.presId,note:'Nuit précédente'});
   PARTS.forEach(([k,lab])=>j.parts[k].forEach(e=>{
     if(e.t==='lieu'){const r=L.get(e.lieuId);if(!r)return;
       lg.push({id:uid(),type:'trajet',nature:LT.trajet[1],lieu:'Vers '+lieuNom(r),duree:'',km:'',itin:r.d.a_itin||'',todo:'Temps et kilométrage de ce trajet à renseigner'});
       const fl=lieuFlags(r,{date,part:k,pax:o.pax}).filter(f=>f.lvl!=='info').map(f=>'⚠ '+f.txt),rem=[...pratiques(r.d).map(x=>x[0]+' : '+x[1]),...fl];
-      const v=o.vm?vis.find(x=>x.id===o.vm[r.id]):vis.find(x=>x.lieuId===r.id);
-      lg.push({id:uid(),type:'arret',nature:LT.arret[1],lieu:lieuNom(r),duree:String(num(e.duree)||lieuDuree(r)||''),repId:r.id,visId:v?v.id:'',contenu:r.d.c_themes||'',rem:rem.join('\n')+(e.note?'\n'+e.note:''),
+      const v=vis.find(x=>x.id===e.visId&&x.lieuId===r.id)||(o.vm&&r.id in o.vm?vis.find(x=>x.id===o.vm[r.id]):null)||entVis(e,vis),fo=v&&e.fId?v.formules.find(f=>f.id===e.fId):null;
+      lg.push({id:uid(),type:'arret',nature:LT.arret[1],lieu:lieuNom(r),duree:String(num(e.duree)||(fo?fTot(v,fo).d:0)||lieuDuree(r)||''),repId:r.id,visId:v?v.id:'',fId:fo?fo.id:'',contenu:r.d.c_themes||'',rem:rem.join('\n')+(e.note?'\n'+e.note:''),
         todo:'',itin:''});
       addContact({role:'Site',lieuId:r.id,note:r.d.contact||''})}
     else if(e.t==='repas'){const p=P(e.presId);lg.push({id:uid(),type:'repas',nature:LT.repas[1],lieu:(p&&p.nom)||e.note||'Repas',duree:String(num(e.duree)||60),rem:[p&&p.tel?'Tél. '+p.tel:'',e.note].filter(Boolean).join(' — ')});
       if(p)addContact({role:'Restaurant',presId:p.id,note:e.note||''})}
     else if(e.t==='libre')lg.push({id:uid(),type:'libre',nature:LT.libre[1],lieu:e.note||'Temps libre',duree:String(num(e.duree)||'')});
     else lg.push({id:uid(),type:'arret',nature:LT.arret[1],lieu:e.note||'Activité',duree:String(num(e.duree)||'')})}));
-  lg.push({id:uid(),type:'fin',nature:LT.fin[1],lieu:sejNow?'Retour : '+sn(sejNow):'',duree:''});
+  lg.push({id:uid(),type:'fin',nature:LT.fin[1],lieu:fin.txt?(fin.nuit?'Retour : ':'Dépose : ')+fin.txt:'',duree:''});
   if(sejNow&&sejNow.presId)addContact({role:'Hébergement',presId:sejNow.presId,note:'Nuit du jour '+(ji+1)});
   Object.assign(t,{titre:(c.titre||'Circuit')+' — jour '+(ji+1)+(j.titre?' : '+j.titre:''),sous:o.ed,date,debut:j.debut||'09:00',circId:c.id,jour:ji+1,ed:o.ed,lignes:lg,contacts:ct});
-  t.h.effectif=o.pax?o.pax+' participants':'';t.h.prestation=(c.titre||'Circuit')+', jour '+(ji+1)+' sur '+c.jours.length;
+  t.h.effectif=o.pax?o.pax+' participants':'';t.h.pec=[j.debut,dep].filter(Boolean).join(' · ');t.h.finlieu=fin.txt;
+  const nA=Math.max(0,Math.round(num(c.acc)));t.accs=Array.from({length:nA},(_,n)=>({id:uid(),role:n===0?'Guide principal':n===1?'Chauffeur':'Autre accompagnateur',presId:'',nom:n===0?[profil.prenom,profil.nom].filter(Boolean).join(' '):'',tel:n===0?(profil.tel||''):''}));t.h.prestation=(c.titre||'Circuit')+', jour '+(ji+1)+' sur '+c.jours.length;
   return t}
 
 /* ---------- Document du circuit ---------- */
-function cirModel(c,L,pres){
+function cirModel(c,L,pres,V=[]){
   const al=circAlerts(c,L),n=cirLieuIds(c).length,vp=verdict('pmr',al,n),vc=verdict('car',al,n),cc=circCalc(c,L);
-  const B=[{h1:c.titre||'Circuit'},{meta:['Circuit',c.jours.length+' jour'+(c.jours.length>1?'s':''),num(c.pax)?num(c.pax)+' participants':'',c.depart?'départ le '+frDate(c.depart):''].filter(Boolean).join(' · ')}];
+  const B=[{h1:c.titre||'Circuit'},{meta:['Circuit',c.jours.length+' jour'+(c.jours.length>1?'s':''),num(c.pax)?'effectif de référence : '+num(c.pax):'',c.depart?'départ le '+frDate(c.depart):''].filter(Boolean).join(' · ')}];
   if(c.desc)B.push({p:c.desc});
   B.push({h2:'Contraintes du circuit'},{table:[['Accessible PMR',vp.txt+(vp.who.length?' — '+whoTxt(vp.who):'')],['Accessible en autocar',vc.txt+(vc.who.length?' — '+whoTxt(vc.who):'')]]});
   const rest=al.filter(a=>a.cat!=='pmr'&&a.cat!=='car'&&a.lvl!=='info');
   if(rest.length)B.push({grid:{w:[1800,2400,1600,5000],head:['Niveau','Lieu','Où','Contrainte'],rows:rest.map(a=>[{t:lvlName[a.lvl],b:a.lvl==='bloc',fill:a.lvl==='bloc'?'F8D7D0':'FFF2A8'},a.lieu,a.where,a.txt])}});
   const rows=[];c.jours.forEach((j,ji)=>PARTS.forEach(([k,lab])=>{const A=j.parts[k];if(!A.length)return;A.forEach(e=>{
     const r=e.t==='lieu'?L.get(e.lieuId):null,p=e.presId&&pres.find(x=>x.id===e.presId);
-    const what=e.t==='lieu'?(r?lieuNom(r):'(lieu introuvable)'):e.t==='repas'?'Repas'+(p?' — '+p.nom+(p.tel?' ('+p.tel+')':''):'')+(e.note?' — '+e.note:''):e.t==='libre'?'Temps libre'+(e.note?' — '+e.note:''):(e.note||'Activité');
-    const d=num(e.duree)||(r?lieuDuree(r):0);
+    const what=e.t==='lieu'?(r?lieuNom(r)+(fo?' — '+(fo.nom||'formule'):''):'(lieu introuvable)'):e.t==='repas'?'Repas'+(p?' — '+p.nom+(p.tel?' ('+p.tel+')':''):'')+(e.note?' — '+e.note:''):e.t==='libre'?'Temps libre'+(e.note?' — '+e.note:''):(e.note||'Activité');
+    const d=e.t==='lieu'?entDuree(e,r,V):num(e.duree),fo=e.t==='lieu'?entForm(e,entVis(e,V)):null;
     rows.push([{t:'Jour '+(ji+1)+(j.titre?'\n'+j.titre:''),b:1},lab,{t:what,b:e.t==='lieu'},d?mins(d):'—',r?lieuFlags(r,{date:dayDate(c,ji),part:k,pax:c.pax}).filter(f=>f.lvl!=='info').map(f=>f.short).join(' ; '):''])})}));
+  B.push({h2:'Prise en charge et fin de journée'},{grid:{w:[1500,1700,4600,4300],head:['Jour','Prise en charge','Lieu de prise en charge','Fin de journée'],rows:c.jours.map((j,ji)=>{const f=cirFin(c,ji,pres);return [{t:'Jour '+(ji+1)+(j.titre?'\n'+j.titre:''),b:1},j.debut||'—',cirDep(c,ji,pres)||'à préciser',f.txt?(f.nuit?'Nuit : ':'Dépose : ')+f.txt:'à préciser']})}});
   if(rows.length)B.push({h2:'Programme'},{grid:{w:[1700,1400,4400,1000,4300],head:['Jour','Partie','Programme','Durée','Contraintes'],rows}});
   if(c.sejours.length)B.push({h2:'Séjours'},{grid:{w:[2200,3200,1200,3000,1500],head:['Séjour','Établissement','Nuits','Coordonnées','Prix / nuit'],rows:c.sejours.map(s=>{const p=pres.find(x=>x.id===s.presId);return [s.type||'',(p&&p.nom)||s.nom||'',String(c.jours.filter(j=>j.sejId===s.id).length),p?[p.adresse,p.tel].filter(Boolean).join('\n'):'',blank(s.pu)?'—':eur(num(s.pu))]})}});
   if(cc.lines.length)B.push({h2:'Budget du circuit (coûts)'},{grid:{w:[5200,3000,1800],head:['Poste','Calcul','Total'],rows:[...cc.lines.map(l=>[l.poste||'',num(l.pu)?eur(num(l.pu))+' × '+String(qty(l)).replace('.',',')+(l.mode==='fixe'?' (forfait)':''):'sans montant',eur(lineCost(l,cc.k.n,cc.k.acc))]),[{t:'Total',b:1},'',{t:eur(cc.k.total),b:1}]]}},{p:'Coût de revient par participant payant : '+eur(cc.k.rev)+(cc.warn.length?'. ATTENTION, budget incomplet : '+[...new Set(cc.warn)].join(' ; ')+'.':'.')});
@@ -1386,8 +1428,10 @@ function cirModel(c,L,pres){
 NEW.pre=()=>({id:uid(),kind:'pre',updated:Date.now(),nom:'',role:'Restaurant',contact:'',tel:'',tel2:'',mail:'',adresse:'',web:'',note:''});
 KINDS.pre={list:'preList',one:'prestataire',ico:'📇',empty:'Annuaire vide',hint:'',add:'＋ Nouveau prestataire',
   title:i=>i.nom||'Prestataire sans nom',sub:i=>[i.role,i.tel].filter(Boolean).join(' · '),pills:i=>[i.contact||'']};
-const PRES_ICO={'Chauffeur':'🚐','Autocariste':'🚌','Société sous-traitante':'🏢','Guide local':'🧭','Guide-conférencier':'🎙️','Restaurant':'🍽️','Hébergement':'🛏️','Site / gestionnaire':'🏛️','Autre':'📇'};
-const presIco=p=>PRES_ICO[p.role]||'📇';
+/* chauffeur : volant et silhouette derrière (le minibus se confondait avec l'autocar) */
+const ICO_DRV='<svg viewBox="0 0 32 32" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="16" cy="7.5" r="4.2"/><path d="M7 18.5c1.2-3.6 4.4-5.5 9-5.5s7.8 1.9 9 5.5"/><circle cx="16" cy="22.5" r="6.2"/><circle cx="16" cy="22.5" r="1.5"/><path d="M9.8 22.5h4.7M17.5 22.5h4.7M16 24v4.2"/></svg>';
+const PRES_ICO={'Chauffeur':ICO_DRV,'Autocariste':'🚌','Société sous-traitante':'🏢','Guide local':'🧭','Guide-conférencier':'🎙️','Restaurant':'🍽️','Hébergement':'🛏️','Site / gestionnaire':'🏛️','Autre':'📇'};
+const presIco=p=>PRES_ICO[p.role]||'📇',presIcoS=p=>presIco(p).replace('width="44" height="44"','width="18" height="18" style="vertical-align:-3px"');
 const telHref=t=>'tel:'+String(t||'').replace(/[^\d+]/g,'');
 let preFilter='',preQ='';
 VIEWS.preList={top:1,t:()=>'Tiango '+sub2('Annuaire des prestataires'),async r(){
@@ -1425,7 +1469,7 @@ function contactInfo(ct,pres,reps){
   return {nom:ct.nom||'',tel:ct.tel||'',mail:'',det:'',ok:1}}
 function drawContacts(c,pres,reps,sibs){
   const b=$('#cCt');if(!b)return;
-  const src=ct=>`<option value="">— saisie libre —</option>${pres.length?`<optgroup label="Annuaire">${pres.filter(p=>!ct.role||p.role===ct.role||p.id===ct.presId).map(p=>`<option value="p:${esc(p.id)}"${p.id===ct.presId?' selected':''}>${esc(p.nom||'Sans nom')}</option>`).join('')}</optgroup>`:''}<optgroup label="Sites">${reps.map(r=>`<option value="l:${esc(r.id)}"${r.id===ct.lieuId?' selected':''}>${esc(lieuNom(r))}</option>`).join('')}</optgroup>`;
+  const src=ct=>`<option value="">— saisie libre —</option>${pres.length?`<optgroup label="Annuaire">${pres.filter(p=>!ct.role||p.role===ct.role||p.id===ct.presId).map(p=>`<option value="p:${esc(p.id)}"${p.id===ct.presId?' selected':''}>${esc(p.nom||'Sans nom')}</option>`).join('')}</optgroup>`:''}${ct.role==='Site'||ct.lieuId?`<optgroup label="Sites">${reps.map(r=>`<option value="l:${esc(r.id)}"${r.id===ct.lieuId?' selected':''}>${esc(lieuNom(r))}</option>`).join('')}</optgroup>`:''}`;
   b.innerHTML=`<p class="mute" style="margin:12px 0 0">Chauffeur, autocariste, guide local, restaurant, site à visiter, hébergement : choisissez dans l'annuaire (menu ☰) ou saisissez à la main. Le numéro suit la fiche : corrigé dans l'annuaire, il l'est partout.</p>`
    +c.contacts.map((ct,i)=>{const I=contactInfo(ct,pres,reps),free=!ct.presId&&!ct.lieuId;
      return `<div class="pt" data-i="${i}"><div class="hd"><select data-cf="role" aria-label="Rôle" class="ty">${CT_ROLES.map(r=>`<option${r===ct.role?' selected':''}>${esc(r)}</option>`).join('')}</select><button class="mini" data-ca="up" aria-label="Monter"${i?'':' disabled'}>↑</button><button class="mini" data-ca="dn" aria-label="Descendre"${i<c.contacts.length-1?'':' disabled'}>↓</button><button class="mini" data-ca="rm" aria-label="Supprimer">🗑</button></div>
@@ -1504,7 +1548,7 @@ async function preImport(j){
   if(!(await gate('pre',add.length)))return;
   $('#modal').innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="Importer les contacts"><div class="sheet"><h2>Importer ${add.length} contact${add.length>1?'s':''} ?</h2>
    <p class="mute">${dup.length?dup.length+' déjà présent'+(dup.length>1?'s':'')+' (même nom et même téléphone) : ignoré'+(dup.length>1?'s':'')+'. ':''}Aperçu :</p>
-   <div style="max-height:40vh;overflow:auto">${add.slice(0,40).map(p=>`<div class="doc"><span>${presIco(p)} <b>${esc(p.nom)}</b> · ${esc(p.role)}${p.tel?' · '+esc(p.tel):''}</span></div>`).join('')}${add.length>40?'<p class="mute">… et '+(add.length-40)+' autres.</p>':''}</div>
+   <div style="max-height:40vh;overflow:auto">${add.slice(0,40).map(p=>`<div class="doc"><span>${presIcoS(p)} <b>${esc(p.nom)}</b> · ${esc(p.role)}${p.tel?' · '+esc(p.tel):''}</span></div>`).join('')}${add.length>40?'<p class="mute">… et '+(add.length-40)+' autres.</p>':''}</div>
    <div class="row" style="margin-top:14px"><button class="btn sec grow" id="mNo">Annuler</button><button class="btn acc grow" id="pvOk">Importer</button></div></div></div>`;
   $('#mNo').onclick=closeModal;
   $('#pvOk').onclick=async()=>{try{await txm(['items'],S=>add.forEach(p=>S('items').put(p)));closeModal();toast(add.length+' contact'+(add.length>1?'s':'')+' importé'+(add.length>1?'s':''),4500);modTouch();go('preList')}catch(e){toast('Import impossible : '+e.message,6000)}}}
@@ -1819,9 +1863,13 @@ LANGUES DU DISCOURS : ${lg}
 DURÉE VISÉE : ${d.duree||'à proposer, avec plusieurs formules'}
 PUBLIC : ${d.public||'adultes, tous publics'}${d.plus?'\nPRÉCISIONS : '+d.plus:''}${d.pts?`
 
-POINTS DU SITE DÉJÀ REPÉRÉS PAR LE GUIDE — chacun doit avoir au moins un module, dans cet ordre, avec son nom recopié à l'identique dans le champ "lieu" du module :
+${d.compl?'POINTS À COMPLÉTER — ce site a déjà un discours ; seuls ces points n\'ont pas encore de module. Rédige un module (ou plusieurs) pour chacun, avec son nom recopié à l\'identique dans le champ "lieu" du module :':'POINTS DU SITE DÉJÀ REPÉRÉS PAR LE GUIDE — chacun doit avoir au moins un module, dans cet ordre, avec son nom recopié à l\'identique dans le champ "lieu" du module :'}
 ${d.pts}
-Si un point mérite plusieurs discours, fais plusieurs modules. N'ajoute un module hors de cette liste que s'il est indispensable (accueil, pause) ; le guide ajoutera lui-même les autres.`:''}
+${d.compl?`
+MODULES DÉJÀ EXISTANTS (ne les reprends pas, ne les modifie pas, ne les remplace pas) :
+${d.exist}
+Numérote tes nouveaux modules à partir de ${d.nextCode} (M pour une station, P pour une pause, EXT- pour une extension) pour ne pas reprendre un code existant.${d.angle?'\nFil rouge du discours existant, à respecter pour le ton : '+d.angle:''}
+Laisse vides (tableaux vides, chaînes vides) toutes les rubriques qui ne concernent pas ces nouveaux modules : fiche pratique, formules, sécurité, plan B, glossaire. Des questions fréquentes ou des anecdotes ne sont attendues que si elles concernent ces nouveaux points.`:'Si un point mérite plusieurs discours, fais plusieurs modules. N\'ajoute un module hors de cette liste que s\'il est indispensable (accueil, pause) ; le guide ajoutera lui-même les autres.'}`:''}
 
 CE QUI EST ATTENDU
 - Un parcours découpé en modules autonomes (M0 accueil et consignes, M1, M2… ; P1 pour les pauses ; EXT-A… pour les extensions), chacun avec un site précis, une durée sur place, un temps de parole, ce que l'on voit, un message clé et l'endroit où placer le groupe.
@@ -1859,7 +1907,11 @@ async function aiSheet(kind,o={}){
   const d={},V=kind==='vis';
   if(V&&o.siteId){const r=(await live('reps')).map(fixRep).find(x=>x.id===o.siteId);
     if(r){d.siteId=r.id;d.sujet=lieuNom(r);d.lieu=[r.d.ville,r.d.pays].filter(Boolean).join(', ');
-      d.pts=(r.points||[]).filter(p=>String(p.nom||'').trim()).map((p,i)=>'- P'+(i+1)+' : '+String(p.nom).trim()+(p.duree?' ('+p.duree+' min)':'')+(p.note?' — '+String(p.note).replace(/\s+/g,' ').trim():'')).join('\n')}}
+      const ex=(await live('items')).filter(x=>x.kind==='vis'&&x.lieuId===r.id).map(fixItem).sort((a,b)=>b.modules.length-a.modules.length)[0];
+      d.compl=!!(ex&&ex.modules.length);
+      const L_=d.compl?visMiss(ex,r):(r.points||[]).filter(p=>String(p.nom||'').trim());
+      d.pts=L_.map(p=>'- '+String(p.nom).trim()+(p.duree?' ('+p.duree+' min)':'')+(p.note?' — '+String(p.note).replace(/\s+/g,' ').trim():'')).join('\n');
+      if(d.compl){d.exist=ex.modules.map(m=>'- '+[m.code,m.lieu].filter(Boolean).join(' : ')).join('\n');d.angle=ex.angle||'';d.nextCode=nextMCode(ex)}}}
   if(V)d.role='conf';
   if(kind==='cir')d.noms=(await live('reps')).map(fixRep).filter(r=>!r.ctiId).map(r=>'- '+lieuNom(r)+(r.d.ville?' ('+r.d.ville+')':'')).join('\n');
   const F=kind==='lieu'?[['sujet','Site à décrire (ex. Abbaye du Mont-Saint-Michel)','text','wide'],['lieu','Ville, pays','text'],['plus','Précisions (ce que vous savez déjà, ce qui vous intéresse)','textarea']]
@@ -1868,7 +1920,7 @@ async function aiSheet(kind,o={}){
     :[['sujet','Prestation (ex. Excursion côte sud de Séné)','text','wide'],['lieu','Secteur, communes traversées','text'],['duree','Date, heure de début et de fin','text'],['public','Clients, effectif, moyen de transport','text'],['plus','Précisions (arrêts souhaités, contraintes)','textarea']];
   if(V)d.langues='fr, en, es';
   $('#modal').innerHTML=`<div class="modal"><div class="sheet"><h2>Faire rédiger par une IA</h2>
-   ${V&&d.pts?`<div class="box"><b class="l">Points du site repris dans la consigne</b><pre style="white-space:pre-wrap;margin:6px 0 0;font:inherit">${esc(d.pts)}</pre><p class="mute" style="margin:6px 0 0">L'IA rédige au moins un module par point.</p></div>`:V&&d.siteId?'<div class="box warn">Ce site n\'a pas encore de points : le discours sera construit sans eux. Vous pouvez les saisir dans la fiche du site avant de continuer.</div>':''}
+   ${V&&d.compl&&!d.pts?'<div class="box warn">Tous les points de ce site ont déjà un module dans le discours. Ajoutez d\'abord un point à la fiche du site : la consigne ne portera que sur les points sans module.</div>':''}${V&&d.pts?`<div class="box"><b class="l">${d.compl?'Points sans discours, seuls repris dans la consigne':'Points du site repris dans la consigne'}</b><pre style="white-space:pre-wrap;margin:6px 0 0;font:inherit">${esc(d.pts)}</pre><p class="mute" style="margin:6px 0 0">${d.compl?'Les modules existants ne sont pas touchés : l\'import ajoutera les nouveaux à la suite.':'L\'IA rédige au moins un module par point.'}</p></div>`:V&&d.siteId?'<div class="box warn">Ce site n\'a pas encore de points : le discours sera construit sans eux. Vous pouvez les saisir dans la fiche du site avant de continuer.</div>':''}
    <p class="mute">Tiango prépare la consigne. Copiez-la dans Claude ou dans l'IA de votre choix, puis rapportez sa réponse ici avec « Importer ».</p>
    <div class="grid" id="aiF">${F.map(f=>field(f,d,'ai_')).join('')}</div>
    <div class="f"><label for="aiOut">Consigne à transmettre à l'IA</label><textarea class="code" id="aiOut" readonly></textarea></div>
@@ -1896,7 +1948,7 @@ async function importAny(text){
   if(j.format==='tiango-lieu')return lieuImport(j);
   if(j.format==='tiango-circuit')return cirImport(j);
   const gk=j.format==='tiango-visite'?'vis':j.format==='tiango-cti'?'cti':j.format==='tiango-lieu'?'reps':j.format==='tiango-circuit'?'cir':null;
-  if(gk&&!(await gate(gk)))return;
+  if(gk&&gk!=='vis'&&!(await gate(gk)))return;   /* discours : le quota ne joue que si un nouveau discours est créé (pas en complétant l'existant) */
   if(j.format==='tiango-lieu')return lieuImport(j);
   if(j.format==='tiango-circuit')return cirImport(j);
   const it=j.format==='tiango-visite'?visIn(j):j.format==='tiango-cti'?ctiIn(j):null;
@@ -1912,7 +1964,10 @@ async function importAny(text){
       if(!r){r={id:uid(),created:Date.now(),updated:Date.now(),d:{site:it.nom.trim(),ville:String(it.lieu||'').trim(),type:TYPES.includes(it.type)?it.type:'',pays:'France',notes:'Fiche créée par l\'import d\'un discours de visite : à compléter au repérage (horaires, tarifs, accessibilité…).'},gps:null,points:[],bud:[],np:0,nd:0,cover:''};nl=1}
       else if(!String(r.d.ville||'').trim()&&it.lieu){r.d.ville=String(it.lieu).trim();r.updated=Date.now();nl=2}
       if(r)it.lieuId=r.id}
+    const ex=r?(await live('items')).filter(x=>x.kind==='vis'&&x.lieuId===r.id&&(x.modules||[]).length).map(fixItem).sort((a,b)=>b.updated-a.updated)[0]:null;
+    if(ex){const ch=await visMerge(ex,it,r);if(ch==='done')return;if(ch==='cancel')return}   /* ce site a déjà un discours : on le complète, on ne l'écrase pas */
     const vides=r?(await live('items')).filter(x=>x.kind==='vis'&&x.lieuId===r.id&&x.id!==it.id&&!(x.modules||[]).length).map(x=>x.id):[];   /* discours vide créé à la main : remplacé par celui de l'IA */
+    if(!vides.length&&!(await gate('vis')))return;
     await txm(['reps','items'],S=>{if(r&&nl)S('reps').put(r);S('items').put(it);vides.forEach(i=>S('items').delete(i))});modTouch()}
   else await DB.put('items',it);
   closeModal();toast(it.kind==='vis'?`Discours importé : ${it.modules.length} modules, ${it.langs.map(l=>l.toUpperCase()).join(', ')}`+(r?(nl===1?' · nouveau site créé : '+lieuNom(r):' · site : '+lieuNom(r)):' · site à choisir')+(visIn.dup&&visIn.dup.length?' · codes en double renumérotés : '+visIn.dup.join(', '):''):`CTI importé : ${it.lignes.length} lignes`,5500);go(it.kind,it.id);
@@ -2013,6 +2068,37 @@ function chooseSite(cands,it){return new Promise(res=>{
    <div style="display:grid;gap:10px;margin-top:12px">${cands.map(r=>`<button class="btn sec" data-s="${esc(r.id)}">${esc(lieuNom(r))}${r.d.ville?' — '+esc(r.d.ville):' — lieu non précisé'}</button>`).join('')}
    <button class="btn sec" data-s="new">Créer un nouveau site${it.lieu?' à '+esc(it.lieu):''}</button><button class="btn" data-s="">Annuler l'import</button></div></div></div>`;
   $$('#modal [data-s]').forEach(b=>b.onclick=()=>{closeModal();res(b.dataset.s===''?null:b.dataset.s)})})}
+
+/* ---------- Import d'un discours pour un site qui en a déjà un : on complète, on n'écrase rien ---------- */
+function visMerge(ex,it,r){return new Promise(res=>{
+  const dupOf=m=>ex.modules.find(x=>(m.lieu&&sameName(m.lieu,x.lieu))||sameName(m.titre&&m.titre.fr,x.titre&&x.titre.fr)&&nmz(m.titre&&m.titre.fr)||(x.code&&m.code&&String(x.code).trim().toLowerCase()===String(m.code).trim().toLowerCase()&&sameName(m.lieu,x.lieu)));
+  const rows=it.modules.map((m,i)=>({m,i,d:dupOf(m)}));
+  const n=rows.filter(x=>!x.d).length;
+  $('#modal').innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="Compléter le discours"><div class="sheet"><h2>Ce site a déjà un discours</h2>
+   <p class="mute">« ${esc(ex.nom||lieuNom(r))} » compte déjà ${ex.modules.length} module${ex.modules.length>1?'s':''}. Rien n'est écrasé : cochez les modules à ajouter à la suite. Ceux qui ressemblent à un module existant sont décochés.</p>
+   <div style="max-height:46vh;overflow:auto">${rows.map(x=>`<label class="doc" style="display:flex;gap:10px;align-items:flex-start;padding:8px 0"><input type="checkbox" data-mi="${x.i}"${x.d?'':' checked'} style="margin-top:4px"><span><b>${esc([x.m.code,x.m.lieu].filter(Boolean).join(' — ')||'Module')}</b>${x.d?`<br><span class="mute">semble déjà présent : « ${esc([x.d.code,x.d.lieu].filter(Boolean).join(' — '))} »</span>`:'<br><span class="mute">nouveau</span>'}</span></label>`).join('')}</div>
+   <div class="row" style="margin-top:14px"><button class="btn sec grow" id="mgNo">Annuler</button><button class="btn acc grow" id="mgOk">Ajouter à ce discours</button></div>
+   <div class="row" style="margin-top:8px"><button class="btn sec grow" id="mgSep">Créer plutôt un discours séparé</button></div></div></div>`;
+  $('#mgNo').onclick=()=>{closeModal();res('cancel')};
+  $('#mgSep').onclick=()=>res('separate');
+  $('#mgOk').onclick=async()=>{
+    const pick=$$('#modal [data-mi]').filter(c=>c.checked).map(c=>it.modules[+c.dataset.mi]);
+    if(!pick.length)return toast('Cochez au moins un module');
+    const used=new Set(ex.modules.map(m=>String(m.code||'').trim().toLowerCase())),remap={};
+    pick.forEach(m=>{const k=String(m.code||'').trim(),pre=(/^[A-Za-z-]+/.exec(k)||['M'])[0];
+      if(!k||used.has(k.toLowerCase())){let n=1+Math.max(0,...[...used].map(c=>{const x=new RegExp('^'+pre.replace(/-/g,'\\-')+'(\\d+)$','i').exec(c);return x?+x[1]:0}));let c=pre+n;while(used.has(c.toLowerCase()))c=pre+(++n);if(k)remap[k]=c;m.code=c}
+      used.add(String(m.code).toLowerCase());
+      const pt=(r.points||[]).find(p=>modCovers(m,p));if(pt)m.ptId=pt.id});
+    ex.modules.push(...pick);
+    for(const l of it.langs||[])if(!ex.langs.includes(l))ex.langs.push(l);
+    const key=(a,f)=>new Set(a.map(f).map(nmz)),addNew=(dst,src,f,fix)=>{const k=key(dst,f);src.forEach(x=>{const kx=nmz(f(x));if(kx&&!k.has(kx)){k.add(kx);dst.push(fix?fix(x):x)}})};
+    const rm=c=>remap[String(c||'').trim()]||c;
+    addNew(ex.faq,it.faq,x=>x.q&&x.q.fr,x=>({...x,stat:rm(x.stat)}));
+    addNew(ex.anec,it.anec,x=>x.titre,x=>({...x,stat:rm(x.stat)}));
+    addNew(ex.planb,it.planb,x=>x.sit);addNew(ex.nepas,it.nepas,x=>x.non);addNew(ex.gloss,it.gloss,x=>x.t&&x.t.fr);
+    addNew(ex.sources,it.sources,x=>x.titre||x.url);addNew(ex.conf,it.conf,x=>x.t);
+    ex.updated=Date.now();await DB.put('items',ex);modTouch();closeModal();
+    toast(pick.length+' module'+(pick.length>1?'s':'')+' ajouté'+(pick.length>1?'s':'')+' au discours existant',5000);go('vis',ex.id);res('done')}})}
 /* ================= MODE CONDUITE : dérouler le CTI le jour de la prestation =================
    Le CTI de référence n'est jamais modifié pendant la conduite. Tout ce qui se passe sur place (heures réelles, durées
    raccourcies, arrêts annulés, constats) est noté dans c.run ; au retour, l'utilisateur choisit ce qu'il reporte. */
@@ -2080,7 +2166,7 @@ VIEWS.ctiRun={item:1,back:'cti',t:()=>esc(item.titre||'CTI')+sub2('Conduite de l
       <p class="mute" id="rWin"></p><div class="box" id="rRest" style="font-size:17px;font-weight:650"></div>
       ${l.imp?`<div class="box warn"><b class="l">Horaire impératif</b>${l.hfix?'À '+hm(t2m(l.hfix))+' : ne pas décaler':'Ne pas décaler'}</div>`:''}<div id="rImp"></div>
       ${(l.a_dep||l.a_park||l.a_ent||l.a_rdv)?`<div class="box"><b class="l">Plan d'accès</b>${[['Dépose',l.a_dep],['Stationnement',l.a_park],['Entrée',l.a_ent],['Rendez-vous',l.a_rdv]].filter(x=>x[1]).map(x=>`<div><b>${x[0]}</b> : ${esc(x[1])}</div>`).join('')}</div>`:''}
-      ${(l.bon||l.conf||l.eff||l.conv||l.lim||(l.docs||[]).length)?`<div class="box"><b class="l">Dossier de l'étape</b>${[['Confirmation',l.conf],['Bon / réservation',l.bon],['Effectif attendu',l.eff],['Date limite',l.lim&&frDate(l.lim)],['Convenu',l.conv]].filter(x=>x[1]).map(x=>`<div><b>${x[0]}</b> : ${esc(x[1])}</div>`).join('')}${jusRun(l)}</div>`:''}
+      ${(l.bon||l.conf||l.eff||l.conv||l.lim||(l.docs||[]).length)?`<div class="box"><b class="l">Dossier de l'étape</b>${[['Confirmation',l.conf],['Bon / réservation',l.bon],['Effectif attendu',ctiEff(c,r.i)],['Date limite',l.lim&&frDate(l.lim)],['Convenu',l.conv]].filter(x=>x[1]).map(x=>`<div><b>${x[0]}</b> : ${esc(x[1])}</div>`).join('')}${jusRun(l)}</div>`:''}
       <div id="rRdv"></div>
       ${bx2('Itinéraire',esc(l.itin||''))}${bx2('Commentaire',esc(l.contenu||''))}${bx2('Remarques',esc(l.rem||''),'warn')}${bx2('Constat du repérage',esc(l.obs||''))}${bx2('Non vérifié au repérage',esc(l.todo||''),'warn')}
       <div class="row" style="margin-top:12px">${v?'<button class="btn sec sm grow" id="rVis">🎙 Visite</button>':''}${rep?'<button class="btn sec sm grow" id="rFic">📍 Fiche</button>':''}<button class="btn sec sm grow" id="rTel">☎ Contacts</button><button class="btn sec sm grow" id="rPb">☔ Plan B</button></div>
@@ -2131,7 +2217,7 @@ VIEWS.ctiRun={item:1,back:'cti',t:()=>esc(item.titre||'CTI')+sub2('Conduite de l
       ['Toilettes',[y('s_wc'),d.s_wc_d].filter(Boolean).join(' — ')],['Accès fauteuil',y('p_acc')],['Cheminement',d.p_chem],['Dernière admission',d.h_dern],['Retrait des billets',d.t_billet],['Points de vigilance',d.x_risq],['Solution de repli',d.x_planb],['Abri',y('s_abri')]].filter(x=>x[1]);
     $('#modal').innerHTML=sheetHTML(d.site||'Fiche de repérage',`<p class="mute">${esc([d.adresse,d.cp,d.ville].filter(Boolean).join(' '))}${rep.gps?` · <a href="${esc(gpsUrl(rep.gps))}" target="_blank" rel="noopener" style="color:var(--pri)">Voir sur la carte</a>`:''}${d.date?'<br>Relevé le '+esc(frDate(d.date))+' : à revérifier si la fiche est ancienne.':''}</p>`
       +(R.map(x=>bx2(x[0],esc(x[1]))).join('')||'<p class="mute">La fiche ne contient pas encore d\'informations pratiques.</p>'));$('#mNo').onclick=closeModal};
-  if(v)$('#rVis').onclick=()=>choosePlay(v,(seq,nom)=>{play={seq,i:0,nom,fs:19,back:['ctiRun',c.id]};go('visPlay',v.id)});
+  if(v)$('#rVis').onclick=()=>{const fo=l.fId&&v.formules.find(f=>f.id===l.fId);if(fo&&fSeq(v,fo).length&&!dupCodes(v).length){play={seq:fSeq(v,fo),i:0,nom:fo.nom||'Formule',fs:19,back:['ctiRun',c.id]};return go('visPlay',v.id)}choosePlay(v,(seq,nom)=>{play={seq,i:0,nom,fs:19,back:['ctiRun',c.id]};go('visPlay',v.id)})};
   $('#rPb').onclick=()=>{const all=[...new Set(L.map(x=>x.visId).filter(Boolean))].map(id=>vis.find(x=>x.id===id)).filter(Boolean),src=v?[v]:all,nx=L.slice(r.i+1).find(x=>x.type!=='trajet'&&x.type!=='fin'&&!obj(r.ov[x.id]).skip);
     $('#modal').innerHTML=sheetHTML('Plan B',bx2('Solution de repli prévue',esc(c.h.meteo||''))+(rep?bx2('Repli noté au repérage',esc(rep.d.x_planb||'')):'')
       +src.map(s=>s.planb.filter(p=>p.sit||p.sol).map(p=>bx2(esc((src.length>1?s.nom+' — ':'')+(p.sit||'Situation')),esc([p.sol,p.duree&&'Durée : '+p.duree].filter(Boolean).join('\n')))).join('')).join('')
