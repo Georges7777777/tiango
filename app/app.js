@@ -1544,8 +1544,9 @@ function cirModel(c,L,pres,V=[]){
   if(rest.length)B.push({grid:{w:[1800,2400,1600,5000],head:['Niveau','Lieu','Où','Contrainte'],rows:rest.map(a=>[{t:lvlName[a.lvl],b:a.lvl==='bloc',fill:a.lvl==='bloc'?'F8D7D0':'FFF2A8'},a.lieu,a.where,a.txt])}});
   const rows=[];c.jours.forEach((j,ji)=>PARTS.forEach(([k,lab])=>{const A=j.parts[k];if(!A.length)return;A.forEach(e=>{
     const r=e.t==='lieu'?L.get(e.lieuId):null,p=e.presId&&pres.find(x=>x.id===e.presId);
+    const fo=e.t==='lieu'?entForm(e,entVis(e,V)):null;
     const what=e.t==='lieu'?(r?lieuNom(r)+(fo?' — '+(fo.nom||'formule'):''):'(lieu introuvable)'):e.t==='pause'?'Pause'+(e.note?' — '+e.note:''):e.t==='repas'?'Repas'+(p?' — '+p.nom+(p.tel?' ('+p.tel+')':''):'')+(e.note?' — '+e.note:''):e.t==='libre'?'Temps libre'+(e.note?' — '+e.note:''):(e.note||'Activité');
-    const d=e.t==='lieu'?entDuree(e,r,V):num(e.duree),fo=e.t==='lieu'?entForm(e,entVis(e,V)):null;
+    const d=e.t==='lieu'?entDuree(e,r,V):num(e.duree);
     rows.push([{t:'Jour '+(ji+1)+(j.titre?'\n'+j.titre:''),b:1},lab,{t:what,b:e.t==='lieu'},d?mins(d):'—',r?lieuFlags(r,{date:dayDate(c,ji),part:k,pax:c.pax}).filter(f=>f.lvl!=='info').map(f=>f.short).join(' ; '):''])})}));
   B.push({h2:'Prise en charge et fin de journée'},{grid:{w:[1500,1700,4600,4300],head:['Jour','Prise en charge','Lieu de prise en charge','Fin de journée'],rows:c.jours.map((j,ji)=>{const f=cirFin(c,ji,pres);return [{t:'Jour '+(ji+1)+(j.titre?'\n'+j.titre:''),b:1},j.debut||'—',cirDep(c,ji,pres)||'à préciser',f.txt?(f.nuit?'Nuit : ':'Dépose : ')+f.txt:'à préciser']})}});
   if(rows.length)B.push({h2:'Programme'},{grid:{w:[1700,1400,4400,1000,4300],head:['Jour','Partie','Programme','Durée','Contraintes'],rows}});
@@ -1855,7 +1856,7 @@ async function licInit(){try{const s=await DB.get('kv','licence');LIC=s?await li
 function profilId(){if(LIC.state==='valide'||LIC.state==='expiree'){const t=String(LIC.nom||'').trim().split(/\s+/);return {prenom:t[0]||'',nom:t.slice(1).join(' ')}}return {prenom:'Licence',nom:'Démonstration'}}
 async function profilSync(){const id=profilId();if(profil.prenom!==id.prenom||profil.nom!==id.nom){profil={...profil,...id};try{await DB.put('kv',profil,'profil')}catch(e){}}}
 /* Numéro de version affiché dans « À propos » : à garder identique à la constante V de sw.js (tiango-vNN) */
-const APP_VER='27',APP_MAIL='contact@tiango.fr';
+const APP_VER='27.1',APP_MAIL='contact@tiango.fr';
 async function appVers(){try{const k=(await caches.keys()).filter(x=>/^tiango-v/.test(x)).sort();return k.length?k[k.length-1].replace('tiango-v',''):''}catch(e){return ''}}
 function aboutSheet(){
   $('#modal').innerHTML=sheetHTML('À propos de Tiango',`<div class="box" style="text-align:center"><picture><source srcset="logo-dark.png" media="(prefers-color-scheme:dark)"><img class="brand" src="logo.png" alt="Tiango" style="max-width:180px"></picture>
