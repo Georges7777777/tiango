@@ -128,16 +128,17 @@ const safeType=(t,kind)=>{t=String(t||'').toLowerCase().split(';')[0].trim();
 function fixRep(r){r.d=obj(r.d);r.gps=gpsOK(r.gps);r.updated=+r.updated||0;r.created=+r.created||r.updated;
   r.points=arr(r.points).filter(p=>p&&typeof p==='object');r.points.forEach(p=>{if(!okId(p.id))p.id=uid();p.gps=gpsOK(p.gps);if(p.lineId&&!okId(p.lineId))delete p.lineId});
   if(r.ctiId&&!okId(r.ctiId))delete r.ctiId;
-  r.bud=arr(r.bud).filter(x=>x&&typeof x==='object');r.bud.forEach(l=>{if(!okId(l.id))l.id=uid()});return r}
+  r.bud=arr(r.bud).filter(x=>x&&typeof x==='object');r.bud.forEach(l=>{if(!okId(l.id))l.id=uid()});
+  r.formules=arr(r.formules).filter(x=>x&&typeof x==='object');r.formules.forEach(f=>{if(!okId(f.id))f.id=uid();f.nom=typeof f.nom==='string'?f.nom:'';f.pour=typeof f.pour==='string'?f.pour:'';f.steps=Array.isArray(f.steps)?f.steps.filter(x=>typeof x==='string'):[]});return r}
 function fixItem(i){i.updated=+i.updated||0;const A=k=>{i[k]=arr(i[k]).filter(x=>x&&typeof x==='object')};
-  if(i.kind==='cti'){['lignes','pieces','apres'].forEach(A);i.h=obj(i.h);A('contacts');i.contacts.forEach(c=>{if(!okId(c.id))c.id=uid();if(!okId(c.presId))c.presId=''});if(!okId(i.circId))i.circId='';i.lignes.forEach(l=>{if(!okId(l.id))l.id=uid();l.gps=gpsOK(l.gps);if(!okId(l.repId))l.repId='';if(!okId(l.visId))l.visId='';if(!okId(l.fId))l.fId='';l.modCode=typeof l.modCode==='string'?l.modCode:'';l.grp=okId(l.grp)?l.grp:''});A('accs');i.accs.forEach(a=>{if(!okId(a.id))a.id=uid();if(!okId(a.presId))a.presId=''});if(!okId(i.repId))i.repId=''}
+  if(i.kind==='cti'){['lignes','pieces','apres'].forEach(A);i.h=obj(i.h);A('contacts');i.fok=Array.isArray(i.fok)?i.fok.filter(x=>typeof x==='string'):[];i.contacts.forEach(c=>{if(!okId(c.id))c.id=uid();if(!okId(c.presId))c.presId=''});if(!okId(i.circId))i.circId='';i.lignes.forEach(l=>{if(!okId(l.id))l.id=uid();l.gps=gpsOK(l.gps);if(!okId(l.repId))l.repId='';if(!okId(l.visId))l.visId='';if(!okId(l.fId))l.fId='';l.modCode=typeof l.modCode==='string'?l.modCode:'';l.grp=okId(l.grp)?l.grp:''});A('accs');i.accs.forEach(a=>{if(!okId(a.id))a.id=uid();if(!okId(a.presId))a.presId=''});if(!okId(i.repId))i.repId=''}
   if(i.kind==='vis'){if(!okId(i.lieuId))i.lieuId='';['modules','formules','faq','anec','planb','nepas','gloss','sources','conf','fiche'].forEach(A);i.secu=obj(i.secu);
     i.langs=arr(i.langs).map(l=>String(l).toLowerCase()).filter(l=>/^[a-z]{2,3}(-[a-z0-9]{2,4})?$/.test(l));if(!i.langs.length)i.langs=['fr'];
     i.modules.forEach(m=>{m.titre=obj(m.titre);m.texte=obj(m.texte)});i.formules.forEach((f,n)=>{if(!okId(f.id))f.id='f'+n+'-'+String(i.id||'').slice(-8)})}
   if(i.kind==='bud'){A('lignes');if(!okId(i.ctiId))i.ctiId='';if(!okId(i.circId))i.circId=''}
   if(i.kind==='cir'){['jours','sejours','bud'].forEach(A);
     i.jours.forEach(j=>{if(!okId(j.id))j.id=uid();if(!okId(j.sejId))j.sejId='';if(!['','prev'].includes(j.depSrc)&&!/^p:[A-Za-z0-9_-]{1,64}$/.test(String(j.depSrc||'')))j.depSrc='';j.depAdr=String(j.depAdr||'');j.finAdr=String(j.finAdr||'');j.parts=obj(j.parts);
-      PARTS.forEach(([k])=>{j.parts[k]=arr(j.parts[k]).filter(x=>x&&typeof x==='object');j.parts[k].forEach(e=>{if(!okId(e.id))e.id=uid();if(!okId(e.lieuId))e.lieuId='';if(!okId(e.presId))e.presId='';if(!okId(e.visId))e.visId='';if(!okId(e.fId))e.fId='';if(!['lieu','libre','repas','autre'].includes(e.t))e.t='libre'})})});
+      PARTS.forEach(([k])=>{j.parts[k]=arr(j.parts[k]).filter(x=>x&&typeof x==='object');j.parts[k].forEach(e=>{if(!okId(e.id))e.id=uid();if(!okId(e.lieuId))e.lieuId='';if(!okId(e.presId))e.presId='';if(!okId(e.visId))e.visId='';if(!okId(e.fId))e.fId='';if(!okId(e.apres))e.apres='';if(!['lieu','libre','pause','repas','autre'].includes(e.t))e.t='libre'})})});
     i.sejours.forEach(x=>{if(!okId(x.id))x.id=uid();if(!okId(x.presId))x.presId=''});i.bud.forEach(l=>{if(!okId(l.id))l.id=uid()})}
   if(i.kind==='rpg'){A('blocs');i.blocs.forEach(b=>{if(!okId(b.id))b.id=uid();if(!okId(b.lieuId))b.lieuId='';b.d=obj(b.d);b.pts=obj(b.pts);b.gps=gpsOK(b.gps)});if(!okId(i.circId))i.circId='';i.applied=obj(i.applied)}
   return i}
@@ -225,7 +226,7 @@ const VIEWS={};
 let leave=null;                       /* nettoyage à faire en quittant l'écran courant */
 async function go(v,id){
   if(!(await flushAll()))return unsavedBox(()=>go(v,id));
-  if(view==='edit')await syncDur();   /* écriture refusée : la saisie reste à l'écran, l'utilisateur décide */
+  if(view==='edit'||view==='vis')await syncDur();   /* écriture refusée : la saisie reste à l'écran, l'utilisateur décide */
   const V=VIEWS[v];let ni=null,nc=null,nf=null;
   if(id){
     if(V.item){ni=await DB.get('items',id);if(!ni||ni.deleted){toast('Cet élément n\'existe plus sur cet appareil');return go(V.back)}}
@@ -249,7 +250,7 @@ function cards(root,fn){$$('.rep',root).forEach(e=>{e.setAttribute('role','butto
   e.onkeydown=k=>{if(k.key==='Enter'||k.key===' '){k.preventDefault();fn(e.dataset.id)}}})}
 VIEWS.list={top:1,t:()=>'Tiango '+sub2('Sites à visiter par lieu'),r:()=>renderList()};
 let editBack=null;   /* écran d'où l'on a ouvert la fiche : circuit, repérage… */
-const openLieu=(id,back)=>{editBack=back||null;return go('edit',id)};
+const openLieu=(id,back,sc)=>{editBack=back||null;if(sc)OPEN.add(sc);return go('edit',id)};
 VIEWS.edit={get back(){return editBack||'list'},t:()=>esc(cur.d.site||'Nouveau site à visiter')+sub2('Fiche du site'),r:()=>renderEdit()};
 VIEWS.report={back:'edit',t:()=>esc(cur.d.site||'Lieu')+sub2('Compte-rendu'),r:()=>renderReport()};
 VIEWS.syn={back:'list',t:()=>'Synthèse des sites',r:()=>renderSyn()};
@@ -307,16 +308,17 @@ function bindFields(root,d,after){
 async function fillLieux(){let d=$('#dlLieux');if(!d){d=document.createElement('datalist');d.id='dlLieux';document.body.appendChild(d)}
   const L=[...new Set((await live('reps')).map(fixRep).filter(r=>!r.ctiId).map(r=>String(r.d.ville||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));d.innerHTML=L.map(x=>`<option value="${esc(x)}">`).join('')}
 function renderEdit(){fillLieux();
-  const open=new Set($$('details.sec[open]').map(e=>e.dataset.s));if(!open.size&&!cur.d.type)open.add('id');if(OPEN.has('pts')){open.add('pts');OPEN.delete('pts')}
+  const open=new Set($$('details.sec[open]').map(e=>e.dataset.s));if(!open.size&&!cur.d.type)open.add('id');if(OPEN.has('pts')){open.add('pts');OPEN.delete('pts')}if(OPEN.has('for')){open.add('for');OPEN.delete('for')}
   $('#main').innerHTML=SCHEMA.map((s,i)=>`<details class="sec" data-s="${s.k}"${open.has(s.k)?' open':''}><summary><span class="ico">${s.ico}</span>${esc(s.t)}<span class="cnt" data-c="${s.k}"></span></summary>
    <div class="body"><div class="grid">${s.f.map(f=>field(f,cur.d)).join('')}</div>${s.k==='id'?'<div id="gpsBox"></div>':''}</div></details>
    ${i===0?`<details class="sec" data-s="pts"${open.has('pts')?' open':''}><summary><span class="ico">📍</span>Étapes de la visite et photos<span class="cnt" data-c="pts"></span></summary><div class="body" id="ptsBox"></div></details>
+   <details class="sec" data-s="for"${open.has('for')?' open':''}><summary><span class="ico">🧩</span>Formules d'assemblage<span class="cnt" data-c="for"></span></summary><div class="body" id="forBox"></div></details>
    <details class="sec" data-s="docs"${open.has('docs')?' open':''}><summary><span class="ico">📎</span>Documents joints<span class="cnt" data-c="docs"></span></summary><div class="body" id="docsBox"></div></details>`:''}`).join('')
    +`<details class="sec" data-s="bud"${open.has('bud')?' open':''}><summary><span class="ico">💶</span>Budget partiel du site<span class="cnt" data-c="bud"></span></summary><div class="body"><div id="budBox"></div><div id="budTar"></div></div></details>
    <details class="sec" data-s="uses"${open.has('uses')?' open':''}><summary><span class="ico">🔗</span>Sites à visiter, circuits et repérages liés<span class="cnt" data-c="uses"></span></summary><div class="body" id="usesBox"></div></details>
    <div class="row" style="margin:18px 0"><button class="btn danger sm" id="bDel">Supprimer ce site</button></div>`;
   bindFields($('#main'),cur.d,e=>{save();counts();if(e&&e.dataset.k==='site')$('#ttl').firstChild.textContent=e.value||'Nouveau repérage'});
-  drawGps();drawPoints();drawDocs();drawBud();drawUses();counts();
+  drawGps();drawPoints();drawFor();drawDocs();drawBud();drawUses();counts();
   $('#bDel').onclick=async()=>{const lieu=cur,used=await usesOfLieu(lieu.id);if(cur!==lieu)return;
     confirmBox('Supprimer ce site ?',(used.vis.length?'ATTENTION : le discours de visite de ce site ('+used.vis.slice(0,3).map(c=>c.nom||'sans titre').join(', ')+') devra être rattaché à un autre site.\n\n':'')+(used.cir.length?'ATTENTION : ce site figure dans '+used.cir.length+' circuit(s) ('+used.cir.slice(0,4).map(c=>c.titre||'sans titre').join(', ')+'). Ils afficheront « site supprimé » tant que vous ne l\'aurez pas restauré ou remplacé.\n\n':'')+'La fiche, ses photos et ses documents partent à la corbeille. Vous pourrez la restaurer pendant 30 jours depuis le menu.','Mettre à la corbeille',async()=>{
       cur.deleted=Date.now();await save(true);go(editBack||'list');toast('Lieu mis à la corbeille')})};
@@ -324,6 +326,7 @@ function renderEdit(){fillLieux();
 function counts(){
   SCHEMA.forEach(s=>{const n=filled(s),e=$(`[data-c="${s.k}"]`);if(e){e.textContent=n+'/'+s.f.length;e.classList.toggle('full',n>0)}});
   const p=$('[data-c="pts"]'),n=photos().length;if(p){p.textContent=`${cur.points.length} étape${cur.points.length>1?'s':''} · ${n} photo${n>1?'s':''}`;p.classList.toggle('full',n+cur.points.length>0)}
+  const fc=$('[data-c="for"]');if(fc){fc.textContent=cur.formules.length;fc.classList.toggle('full',cur.formules.length>0)}
   const bc=$('[data-c="bud"]');if(bc){bc.textContent=cur.bud.length;bc.classList.toggle('full',cur.bud.length>0)}
   const dc=$('[data-c="docs"]');if(dc){dc.textContent=docs().length;dc.classList.toggle('full',docs().length>0)}
   if(summary(cur,files))save();
@@ -357,22 +360,22 @@ function drawPoints(){
    <button class="mini" data-act="gps" aria-label="Relever la position">📌</button><button class="mini" data-act="up" aria-label="Monter"${i?'':' disabled'}>↑</button><button class="mini" data-act="dn" aria-label="Descendre"${i<cur.points.length-1?'':' disabled'}>↓</button><button class="mini" data-act="rm" aria-label="Supprimer l'étape">🗑</button></div></div>`).join('')}
   <div class="row" style="margin-top:12px"><button class="btn sec grow" id="bPt">＋ Ajouter une étape</button></div>`;
   $$('.pt[data-p]',b).forEach(el=>{const p=cur.points.find(x=>x.id===el.dataset.p),i=cur.points.indexOf(p);
-    bindFields(el,p,()=>save());
+    bindFields(el,p,()=>{save();clearTimeout(window._dfT);window._dfT=setTimeout(()=>{const a=document.activeElement,fb=$('#forBox');if(fb&&!(a&&fb.contains(a)))drawFor()},500)});
     $$('[data-act]',el).forEach(bt=>bt.onclick=async()=>{const a=bt.dataset.act,rep=cur;
       if(a==='gps'){bt.textContent='…';try{p.gps=await getGPS();toast('Position de l\'étape enregistrée')}catch(x){toast(x.message,4000)}
         await saveRep(rep);if(cur===rep&&view==='edit')drawPoints();return}
       if(a==='up')cur.points.splice(i-1,0,cur.points.splice(i,1)[0]);
       if(a==='dn')cur.points.splice(i+1,0,cur.points.splice(i,1)[0]);
       if(a==='rm'){const n=photos(p.id).length;return confirmBox('Supprimer cette étape ?',n?`Ses ${n} photo(s) seront reclassées dans les vues générales.`:'Cette étape sera retirée de la fiche.','Supprimer',async()=>{
-        for(const f of photos(p.id)){f.pointId='';await DB.put('files',f)}cur.points.splice(i,1);save(true);drawPoints();counts()})}
-      save(true);drawPoints()})});
+        for(const f of photos(p.id)){f.pointId='';await DB.put('files',f)}cur.points.splice(i,1);cur.formules.forEach(f=>{f.steps=f.steps.filter(x=>x!==p.id)});save(true);drawPoints();drawFor();counts()})}
+      save(true);drawPoints();drawFor()})});
   $$('[data-cam]',b).forEach(bt=>bt.onclick=()=>shoot(bt.dataset.cam));
   $$('figure[data-f]',b).forEach(e=>{e.onclick=()=>viewPhoto(e.dataset.f);e.onkeydown=k=>{if(k.key==='Enter')viewPhoto(e.dataset.f)}});
   $('#bPt').onclick=()=>addPoint();
 }
 function addPoint(){
   const rep=cur,p={id:uid(),nom:'',note:'',duree:'',gps:null};cur.points.push(p);lastPoint=p.id;save(true);
-  const d=$('details[data-s="pts"]');d.open=true;drawPoints();counts();
+  const d=$('details[data-s="pts"]');d.open=true;drawPoints();drawFor();counts();
   const el=$(`.pt[data-p="${CSS.escape(p.id)}"]`);el.scrollIntoView({behavior:'smooth',block:'center'});$('input',el).focus({preventScroll:true});
   getGPS(8000).then(g=>{if(!rep.points.includes(p))return;p.gps=g;saveRep(rep);if(cur===rep&&view==='edit')drawPointsKeep()}).catch(()=>{});
 }
@@ -613,10 +616,11 @@ const KINDS={
 async function renderItems(kind){
   const K=KINDS[kind],L=(await live('items')).filter(i=>i.kind===kind).map(fixItem).sort((a,b)=>b.updated-a.updated);
   if(view!==K.list)return;
-  if(kind==='vis'){const rl=(await live('reps')).map(fixRep),rm=new Map(rl.map(r=>[r.id,lieuNom(r)+(r.d.ville?' — '+r.d.ville:'')]));L.forEach(i=>{i._ln=rm.get(i.lieuId)||'';i._miss=visMiss(i,rl.find(r=>r.id===i.lieuId)).length});L.sort((a,b)=>(a._ln||'~').localeCompare(b._ln||'~','fr')||(a.nom||'').localeCompare(b.nom||'','fr'))}
+  if(kind==='vis'){const rl=(await live('reps')).map(fixRep),rm=new Map(rl.map(r=>[r.id,lieuNom(r)+(r.d.ville?' — '+r.d.ville:'')]));L.forEach(i=>{const r=rl.find(r=>r.id===i.lieuId);i._ln=rm.get(i.lieuId)||'';i._vl=r?String(r.d.ville||'').trim():'';i._sn=r?lieuNom(r):'';i._miss=visMiss(i,r).length});L.sort((a,b)=>(a._vl?0:1)-(b._vl?0:1)||a._vl.localeCompare(b._vl,'fr')||(a._sn||'~').localeCompare(b._sn||'~','fr')||(a.nom||'').localeCompare(b.nom||'','fr'))}   /* comme la liste des sites : par ville, puis par site */
+  let lastV=null;
   $('#main').innerHTML=`<div class="row" style="margin-top:14px"><button class="btn acc grow" id="iNew">${K.add}</button></div>
    ${K.ai?`<div class="row" style="margin-top:10px"><button class="btn sec grow" id="iAi">✨ Faire rédiger par une IA</button><button class="btn sec grow" id="iImp">📥 Importer</button></div>`:''}
-   ${L.length?L.map(i=>`<div class="card rep" data-id="${esc(i.id)}"><div class="th">${K.ico}</div><div class="grow"><h3>${esc(K.title(i))}</h3><div class="mute">${esc(K.sub(i))}</div>${K.pills(i).filter(Boolean).map(p=>`<span class="pill">${esc(p)}</span>`).join('')}</div></div>`).join('')
+   ${L.length?L.map(i=>`${kind==='vis'&&i._vl!==lastV?(lastV=i._vl,`<h2 class="grp">${esc(i._vl||'Lieu à préciser')}</h2>`):''}<div class="card rep" data-id="${esc(i.id)}"><div class="th">${K.ico}</div><div class="grow"><h3>${esc(K.title(i))}</h3><div class="mute">${esc(K.sub(i))}</div>${K.pills(i).filter(Boolean).map(p=>`<span class="pill">${esc(p)}</span>`).join('')}</div></div>`).join('')
      :`<div class="empty"><b>${K.empty}</b>${K.hint}</div>`}`;
   cards($('#main'),id=>go(kind,id));
   $('#iNew').onclick=async()=>{if(kind==='vis')return pickSite(discoursChoice);if(!(await gate(kind)))return;const it=NEW[kind]();await DB.put('items',it);go(kind,it.id)};
@@ -652,7 +656,7 @@ VIEWS.preview={get back(){return pv.back},t:()=>esc(pv.title)+sub2('Aperçu avan
 /* ================= ESPACE CTI : cadre technique d'itinéraire ================= */
 const LT={pec:['Prise en charge','Prise en charge'],trajet:['Trajet','Déplacement + commentaire à bord'],arret:['Arrêt','Arrêt commenté'],pause:['Pause','Pause'],repas:['Repas','Repas'],libre:['Temps libre','Temps libre'],fin:['Fin de prestation','Fin de prestation / passage de témoin']};
 /* Détail d'un arrêt : un site visité avec plusieurs modules (stations, pause, repas) devient une ligne par module dans le CTI */
-const ctiSteps=(v,fo)=>v?(fo?fSeq(v,fo):v.modules.filter(m=>m.type!=='extension')):[];
+const ctiSteps=(v,fo)=>v?(fo?fSeq(v,fo):v.modules.filter(m=>m.type!=='extension'&&m.type!=='pause'&&m.type!=='repas')):[];
 function ctiSubs(l,v){
   const fo=l.fId&&v?v.formules.find(f=>f.id===l.fId):null,S=ctiSteps(v,fo),g=l.grp||l.id;
   return S.map((m,k)=>{
@@ -741,7 +745,7 @@ VIEWS.cti={item:1,back:'ctiList',t:()=>esc(item.titre||'Nouveau CTI')+sub2('Cadr
   bindSecs();
   const bilan=()=>{const k=ctiCalc(c);$('#cBil').textContent=c.lignes.length?ctiBilan(k):'Ajoutez des trajets et des arrêts : Tiango calcule les horaires, les kilomètres cumulés et le bilan des temps.';
     $('#cBil').classList.toggle('warn',k.marge!==null&&k.marge<0);
-    const im=ctiImp(c).filter(x=>x.late>0),fl=ctiFlags(c,reps);$('#cFl').innerHTML=(im.length?`<div class="box warn"><b>Horaires impératifs non tenus</b>${im.map(x=>`<div class="al bloc">${esc(impTxt(x))}</div>`).join('')}</div>`:'')+(fl.length?`<div class="box warn"><b>Contraintes des sites de ce CTI</b>${fl.map(a=>`<div class="al ${a.lvl}"><b>${esc(a.ico+' '+a.short)}</b> — ${esc(a.lieu)}<div class="mute">${esc(a.txt)}</div></div>`).join('')}</div>`:'');$$('#cL .pt').forEach((el,i)=>{const h=$('.hr',el);if(h&&k.rows[i])h.textContent=k.rows[i].hor+(k.rows[i].att?' · après '+k.rows[i].att+' min d\'attente':'')});setCnt('c_der',String(c.lignes.length))};
+    const im=ctiImp(c).filter(x=>x.late>0);$('#cFl').innerHTML=(im.length?`<div class="box warn"><b>Horaires impératifs non tenus</b>${im.map(x=>`<div class="al bloc">${esc(impTxt(x))}</div>`).join('')}</div>`:'')+'';drawFk();$$('#cL .pt').forEach((el,i)=>{const h=$('.hr',el);if(h&&k.rows[i])h.textContent=k.rows[i].hor+(k.rows[i].att?' · après '+k.rows[i].att+' min d\'attente':'')});setCnt('c_der',String(c.lignes.length))};
   bindFields($('#cId'),c,e=>{saveItem();bilan();if(e&&e.dataset.k==='titre')$('#ttl').firstChild.textContent=e.value||'Nouveau CTI'});
   bindFields($('#cH'),c.h,()=>saveItem());
   const opt=(L,v,lab)=>`<option value="">—</option>`+L.map(x=>`<option value="${esc(x.id)}"${x.id===v?' selected':''}>${esc(lab(x))}</option>`).join('');
@@ -782,11 +786,18 @@ VIEWS.cti={item:1,back:'ctiList',t:()=>esc(item.titre||'Nouveau CTI')+sub2('Cadr
      intro:'Le groupe est accompagné par le guide, éventuellement un second guide, et le chauffeur du car, qui compte aussi comme accompagnateur. Le nom peut être saisi librement.'});
   bilan();
   if($('#cCir'))$('#cCir').onclick=()=>go('cir',c.circId);
+  /* contraintes des sites : à traiter en haut, déjà prises en compte repliées en bas de page */
+  function fkItem(g,i){return `<div class="al ${g.lvl}"><label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" data-fk="${i}"${g.ok?' checked':''} style="margin-top:5px;flex:none"><span><b>${esc(g.ico+' '+g.short)}</b> — ${esc(g.lieux.join(', '))}<div class="mute">${esc(g.txt)}</div></span></label></div>`}
+  function drawFk(){const G=ctiFlagGroups(c,reps),td=G.filter(g=>!g.ok),dn=G.filter(g=>g.ok);
+    $('#cFl').insertAdjacentHTML('beforeend',td.length?`<div class="box warn keep"><b>Contraintes des sites à traiter (${td.length})</b><div class="mute" style="margin:2px 0 6px">Cochez une contrainte quand vous l'avez prise en compte : elle disparaît d'ici et de l'export.</div>${td.map(g=>fkItem(g,G.indexOf(g))).join('')}</div>`:'');
+    let z=$('#cFk');if(!z){$('#main').insertAdjacentHTML('beforeend','<div id="cFk" class="keep"></div>');z=$('#cFk')}
+    z.innerHTML=dn.length?`<details class="box"><summary><b>Contraintes déjà prises en compte (${dn.length})</b></summary>${dn.map(g=>fkItem(g,G.indexOf(g))).join('')}</details>`:'';
+    $$('[data-fk]').forEach(el=>el.onchange=()=>{const g=G[+el.dataset.fk],ix=c.fok.indexOf(g.key);if(el.checked&&ix<0)c.fok.push(g.key);if(!el.checked&&ix>=0)c.fok.splice(ix,1);saveItem(true);bilan()})}
   $('#cRun').onclick=()=>{guiBack=['cti',c.id];go('ctiRun')};
   /* CTI verrouillé tant que son guidage est en cours */
   if(guiState(c)==='cours'){
     $('#main').insertAdjacentHTML('afterbegin',`<div class="box warn keep" style="margin-top:12px"><b class="l">🔒 Guidage en cours : ce CTI n'est plus modifiable</b>Pour le modifier, faites-en une copie : elle aura son propre guidage.<div class="row" style="margin-top:10px"><button type="button" class="btn sm grow" id="cLg">🚩 Ouvrir le guidage</button><button type="button" class="btn sec sm grow" id="cLd">⧉ Créer une copie modifiable</button></div></div>`);
-    $$('#main input,#main select,#main textarea').forEach(e=>e.disabled=true);
+    $$('#main input,#main select,#main textarea').forEach(e=>{if(!e.closest('.keep'))e.disabled=true});
     $$('#main button').forEach(b=>{if(!b.closest('.keep')&&!['cRun','cPv','cChk'].includes(b.id))b.disabled=true});
     $('#cLg').onclick=()=>{guiBack=['cti',c.id];go('ctiRun')};$('#cLd').onclick=dupItem}
   $('#iDel').onclick=()=>delItem('ce CTI');$('#iDup').onclick=dupItem;
@@ -838,7 +849,7 @@ function ctiModel(c,x={}){
   if(c.accs.length)B.push({h2:'Accompagnateurs ('+c.accs.length+')'},{grid:{w:[2600,5400,3600],head:['Fonction','Nom','Téléphone'],rows:c.accs.map(a=>[a.role||'',accNom(a,x.pres||[])||'à préciser',accTel(a,x.pres||[])])}});
   const CT=c.contacts.map(ct=>{const I=contactInfo(ct,x.pres||[],x.reps||[]);return [ct.role||'',I.nom+(I.det?'\n'+I.det:''),I.tel,ct.note||'']});
   if(CT.length)B.push({h2:'Contacts'},{grid:{w:[1800,4200,2600,4400],head:['Rôle','Nom','Téléphone','Remarque'],rows:CT}});
-  const FL=ctiFlags(c,x.reps||[]);if(FL.length)B.push({h2:'Contraintes des sites à traiter'},{grid:{w:[1600,3000,3000,6400],head:['Niveau','Lieu','Contrainte','Détail'],rows:FL.map(a=>[{t:lvlName[a.lvl],b:a.lvl==='bloc',fill:a.lvl==='bloc'?'F8D7D0':'FFF2A8'},a.lieu,a.short,a.txt])}});
+  const FL=ctiFlagGroups(c,x.reps||[]).filter(g=>!g.ok);if(FL.length)B.push({h2:'Contraintes des sites à traiter'},{grid:{w:[1600,3000,3000,6400],head:['Niveau','Lieu','Contrainte','Détail'],rows:FL.map(a=>[{t:lvlName[a.lvl],b:a.lvl==='bloc',fill:a.lvl==='bloc'?'F8D7D0':'FFF2A8'},a.lieux.join(', '),a.short,a.txt])}});   /* les contraintes cochées « prises en compte » ne sont pas exportées */
   if(c.lignes.length){const tr=c.lignes.filter(l=>l.type==='trajet').reduce((n,l)=>n+num(l.duree),0),ar=c.lignes.filter(l=>l.type!=='trajet').reduce((n,l)=>n+num(l.duree),0);
     B.push({h2:'Déroulé horaire'},{grid:{w:[1200,2600,3600,1100,1000,1000,4638],
     head:['Horaire','Étape / lieu','Itinéraire à suivre','Km (étape / cumul)','Durée du trajet','Durée de l\'arrêt','Remarques : sécurité, stationnement, WC, PMR, impératifs'],
@@ -865,13 +876,61 @@ const modByCode=(v,code)=>v.modules.find(m=>(m.code||'').trim().toLowerCase()===
 const dupCodes=v=>{const c={};v.modules.forEach(m=>{const k=(m.code||'').trim().toLowerCase();if(k)c[k]=(c[k]||0)+1});return Object.keys(c).filter(k=>c[k]>1)};
 const fCodes=f=>String(f.codes||'').split(/[,;→>·\n]+/).map(s=>s.trim()).filter(Boolean);
 const fSeq=(v,f)=>fCodes(f).map(c=>modByCode(v,c)).filter(Boolean);
-const vTot=v=>v.modules.filter(m=>m.type!=='extension').reduce((a,m)=>a+num(m.duree),0);
+const vTot=v=>v.modules.filter(m=>m.type!=='extension'&&m.type!=='pause'&&m.type!=='repas').reduce((a,m)=>a+num(m.duree),0);
+/* ===== V27 : les formules d'assemblage appartiennent au SITE (rep.formules : suite d'étapes du site). Le discours en reçoit une projection (v.formules, codes de modules) pour que tout le reste fonctionne sans changement. ===== */
+const isPR=m=>m.type==='pause'||m.type==='repas';
+const covPt=(m,p)=>m.ptId?m.ptId===p.id:modCovers(m,p);
+function projCodes(v,rep,f){const out=[];
+  f.steps.forEach(pid=>{const p=rep.points.find(x=>x.id===pid);if(!p)return;
+    const ms=v.modules.filter(m=>!isPR(m)&&String(m.code||'').trim()&&covPt(m,p)),st=ms.filter(m=>m.type!=='extension');
+    (st.length?st:ms).forEach(m=>{const c=m.code.trim();if(!out.includes(c))out.push(c)})});
+  return out.join(', ')}
+const projForm=(v,rep)=>rep.formules.map(f=>({id:f.id,nom:f.nom||'',pour:f.pour||'',codes:projCodes(v,rep,f)})).filter(f=>f.codes);
+const fKey=a=>JSON.stringify(a.map(f=>[f.id,f.nom,f.pour,f.codes]));
+let mig27=null;
+/* Reprise automatique des anciennes formules (portées par les discours) : elles passent sur le site, les pauses et repas sortent des formules et deviennent des lignes de circuit. Idempotent. */
+async function migrate27(){
+  try{const reps=(await live('reps')).map(fixRep),R=new Map(reps.map(r=>[r.id,r])),all=(await live('items')).map(fixItem),vs=all.filter(i=>i.kind==='vis'),cs=all.filter(i=>i.kind==='cir');
+    const tR=new Set(),tV=new Set(),tC=new Set(),rap=[],leg=new Map();
+    for(const v of vs){if(v.f27)continue;const r=R.get(v.lieuId);if(!r)continue;
+      const info={nom:v.nom||'Discours',site:lieuNom(r),f:0,pts:0,pa:0},L={};
+      v.formules.forEach(f=>{const seq=fSeq(v,f);L[f.id]=seq;if(r.formules.some(x=>x.id===f.id))return;
+        const steps=[];
+        seq.forEach(m=>{if(isPR(m))return;
+          let p=m.ptId?r.points.find(x=>x.id===m.ptId):null;if(!p)p=r.points.find(x=>modCovers(m,x));
+          if(!p){p={id:uid(),nom:String(m.lieu||(m.titre&&m.titre.fr)||m.code||'').trim(),note:'',duree:m.duree?String(num(m.duree)):'',gps:null};r.points.push(p);info.pts++}
+          if(!m.ptId)m.ptId=p.id;if(steps[steps.length-1]!==p.id)steps.push(p.id)});
+        r.formules.push({id:f.id,nom:f.nom||'',pour:f.pour||'',steps});info.f++;tR.add(r)});
+      leg.set(v.id,L);v.f27=1;tV.add(v);if(info.f||info.pts)rap.push(info)}
+    /* circuits : une pause ou un repas qui était dans le discours devient une ligne du circuit, placée après l'étape qui la précède */
+    for(const c of cs)for(const j of c.jours)for(const k of Object.keys(j.parts||{})){const A=j.parts[k];
+      for(let ei=0;ei<A.length;ei++){const e=A[ei];if(e.t!=='lieu'||e.m27||!e.lieuId)continue;
+        const vv=vs.filter(x=>x.lieuId===e.lieuId),v=vv.find(x=>x.id===e.visId)||(vv.length===1?vv[0]:null);if(!v||!leg.has(v.id))continue;
+        const L=leg.get(v.id),seq=e.fId?L[e.fId]:v.modules.filter(m=>m.type!=='extension');e.m27=1;tC.add(c);if(!seq||!seq.some(isPR))continue;
+        const old=seq.reduce((a,m)=>a+num(m.duree),0),add=[],pre=[];let prev=null;
+        seq.forEach(m=>{if(!isPR(m)){prev=m;return}
+          const r=R.get(v.lieuId),p=prev?(prev.ptId?r.points.find(x=>x.id===prev.ptId):r.points.find(x=>modCovers(prev,x))):null;
+          const en={id:uid(),t:m.type==='repas'?'repas':'pause',presId:'',duree:String(num(m.duree)||''),note:String(m.lieu||(m.titre&&m.titre.fr)||'').trim(),pu:'',apres:p?p.id:'',m27:1};
+          (prev?add:pre).push(en)});
+        if(num(e.duree)&&num(e.duree)===old)e.duree='';
+        A.splice(ei+1,0,...add);A.splice(ei,0,...pre);ei+=add.length+pre.length;
+        const ri=rap.find(x=>x.nom===(v.nom||'Discours'))||(rap.push({nom:v.nom||'Discours',site:'',f:0,pts:0,pa:0}),rap[rap.length-1]);ri.pa+=add.length+pre.length;ri.cir=(ri.cir||[]).concat(c.titre||'Circuit sans titre')}}
+    for(const r of tR){r.updated=Date.now();await DB.put('reps',r)}
+    for(const x of new Set([...tV,...tC])){x.updated=Date.now();await DB.put('items',x)}
+    if(rap.length)mig27=(mig27||[]).concat(rap);
+    return rap.length}catch(e){return 0}}
+function mig27Sheet(){if(!mig27||!mig27.length)return;const R=mig27;mig27=null;
+  $('#modal').innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="Mise à jour des formules"><div class="sheet"><h2>Formules d'assemblage : reprise de vos données</h2>
+   <p class="mute">Les formules se règlent désormais sur la fiche du site. Vos formules existantes y ont été reprises, sans rien supprimer. Vos CTI déjà créés ne changent pas.</p>
+   ${R.map(x=>`<div class="box" style="margin-top:8px"><b>${esc(x.nom)}</b>${x.site?' · '+esc(x.site):''}<br>${x.f?x.f+' formule'+(x.f>1?'s':'')+' reprise'+(x.f>1?'s':'')+' sur le site':''}${x.pts?'<br>'+x.pts+' étape'+(x.pts>1?'s':'')+' ajoutée'+(x.pts>1?'s':'')+' à la fiche du site (module sans étape correspondante)':''}${x.pa?'<br>'+x.pa+' pause'+(x.pa>1?'s':'')+' / repas sortis des formules, ajoutés comme lignes dans '+[...new Set(x.cir)].map(esc).join(', '):''}</div>`).join('')}
+   <div class="row" style="margin-top:14px"><button class="btn grow" id="mOk">Compris</button></div></div></div>`;$('#mOk').onclick=closeModal}
 /* Les durées des étapes du site pilotent celles des modules du discours (donc des formules et des circuits). Un module garde sa durée tant que l'étape du site n'a pas changé depuis la dernière synchronisation. Les CTI ne sont jamais touchés : leur durée reste libre. */
 async function syncDur(){
-  try{const reps=(await live('reps')).map(fixRep),L=new Map(reps.map(r=>[r.id,r])),its=(await live('items')).filter(i=>i.kind==='vis').map(fixItem);let n=0;
+  try{await migrate27();const reps=(await live('reps')).map(fixRep),L=new Map(reps.map(r=>[r.id,r])),its=(await live('items')).filter(i=>i.kind==='vis').map(fixItem);let n=0;
     for(const v of its){const r=L.get(v.lieuId);if(!r)continue;let ch=false;
       v.modules.forEach(m=>{const p=(r.points||[]).find(p=>modCovers(m,p));if(!p||blank(p.duree)||!num(p.duree))return;
         const pd=String(num(p.duree));if(m.ptD===pd)return;m.ptD=pd;if(String(num(m.duree))!==pd||blank(m.duree))m.duree=pd;if(!m.ptId)m.ptId=p.id;ch=true});
+      if(v.f27){const pf=projForm(v,r);if(fKey(pf)!==fKey(v.formules)){v.formules=pf;ch=true}}
       if(ch){v.updated=Date.now();await DB.put('items',v);n++}}
     return n}catch(e){return 0}}
 const fTot=(v,f)=>{const s=fSeq(v,f);return {n:s.length,d:s.reduce((a,m)=>a+num(m.duree),0),p:s.reduce((a,m)=>a+num(m.parole),0)}};
@@ -917,25 +976,19 @@ VIEWS.vis={item:1,get back(){return visBack&&item&&visBack[1]===item.lieuId?visB
   $('#vId [data-k="langsTxt"]').onchange=()=>{saveItem(true);VIEWS.vis.r()};
   $('[data-ml="secu"]').oninput=e=>{(v.secu=v.secu||{})[vLang]=e.target.value;saveItem()};
   const cnt=(k,a)=>()=>setCnt(k,String(a.length));
-  editList($('#vMod'),v.modules,[['code','Code (M0, M1, P1, EXT-A…)','text'],['type','Nature','select',MT],['lieu','Lieu précis','text','wide'],['duree','Durée sur place (minutes)','number'],['parole','Temps de parole (minutes)','number'],
+  let drawVFor;
+  editList($('#vMod'),v.modules,[['code','Code (M0, M1, P1, EXT-A…)','text'],['type','Nature','select',MT],['lieu','Lieu précis','text','wide'],['ptId','Étape du site correspondante (la durée et les formules en dépendent)','select',(lx.find(r=>r.id===v.lieuId)||{points:[]}).points.map((p,i)=>[p.id,(i+1)+'. '+(p.nom||'Étape sans nom')])],['duree','Durée sur place (minutes)','number'],['parole','Temps de parole (minutes)','number'],
      ['voir','Ce que l\'on voit','textarea'],['cle','Message clé','textarea'],['place','Où placer le groupe','textarea'],['consigne','Consigne de conduite (jamais prononcée)','textarea'],['titre','Titre de la station','mlt'],['texte','Discours','ml','tall'],['statut','Statut de validation','select',['Brouillon','À recouper','Validé']],['valide','Validé par, le (nom, date)','text'],['src','Source du propos (auteur, titre, page, date de consultation)','textarea']],
-    {lang:L,add:'＋ Ajouter un module',blank:()=>({code:nextMCode(v),type:'station',titre:{},texte:{}}),title:m=>[m.code,m.lieu].filter(Boolean).join(' — '),after:()=>{cnt('v_mod',v.modules)();drawMiss()},
+    {lang:L,add:'＋ Ajouter un module',blank:()=>({code:nextMCode(v),type:'station',titre:{},texte:{}}),title:m=>[m.code,m.lieu].filter(Boolean).join(' — '),after:()=>{cnt('v_mod',v.modules)();drawMiss();drawVFor&&drawVFor()},
      intro:'Chaque module est une étape autonome : un site, une durée, un message clé et le discours dans chaque langue.',
      extra:m=>{const miss=v.langs.filter(l=>!(m.texte||{})[l]),dup=dupCodes(v).includes((m.code||'').trim().toLowerCase());return (dup?`<div class="box warn" style="margin-top:8px">Le code <b>${esc(m.code)}</b> est utilisé par plusieurs modules : les formules ne retrouveraient que le premier. Donnez à chaque module un code différent.</div>`:'')+(m.type==='pause'||!miss.length?'':`<p class="mute" style="margin:8px 0 0">Discours manquant : ${miss.map(lname).join(', ')}</p>`)}});
-  const pickBox=f=>{
-    if(!v.modules.some(m=>(m.code||'').trim()))return '<p class="mute" style="margin:10px 0 0">Aucun module pour l\'instant : créez-les d\'abord dans la section « Modules ».</p>';
-    const seq=fCodes(f).map(c=>c.toLowerCase());
-    return `<div class="f wide" style="margin-top:10px"><label>Modules disponibles : cochez-les dans l'ordre de la visite</label><div class="pks">${v.modules.filter(m=>(m.code||'').trim()).map(m=>{
-      const r=seq.indexOf(m.code.trim().toLowerCase()),on=r>=0,d=[m.lieu,m.type==='pause'?'pause':m.type==='repas'?'repas':'',num(m.duree)?mins(num(m.duree)):''].filter(Boolean).join(' · ');
-      return `<button type="button" class="pk${on?' on':''}" data-pk="${esc(m.code.trim())}" role="checkbox" aria-checked="${on}"><span class="rk">${on?r+1:''}</span><span class="pkt"><b>${esc(m.code)}</b>${d?' — '+esc(d):''}</span></button>`}).join('')}</div><p class="mute" style="margin:6px 0 0;font-size:13px">Le numéro indique la place dans la formule. Décochez pour retirer : les suivants se renumérotent.</p></div>`};
-  const forExtra=f=>{const t=fTot(v,f),bad=fCodes(f).filter(c=>!modByCode(v,c));return pickBox(f)+`<div class="row" style="margin-top:10px"><span class="hr">${mins(t.d)}</span><span class="hr t">${t.n} modules</span><span class="hr t">parole ${mins(t.p)}</span></div>${bad.length?`<div class="box warn">Code${bad.length>1?'s':''} introuvable${bad.length>1?'s':''} parmi les modules : <b>${esc(bad.join(', '))}</b>. ${bad.length>1?'Ils ne sont pas comptés':'Il n\'est pas compté'} dans la durée.</div>`:''}`};
-  editList($('#vFor'),v.formules,[['nom','Nom de la formule','text'],['codes','Ordre des modules (rempli par les cases ci-dessous, modifiable à la main)','text','wide'],['pour','Pour qui, dans quel cas','textarea']],
-    {add:'＋ Ajouter une formule',title:f=>f.nom||'Formule',after:cnt('v_for',v.formules),intro:'Une formule assemble des modules selon la durée disponible. Tiango en calcule la durée totale.',extra:forExtra});
-  $('#vFor').addEventListener('click',e=>{const b=e.target.closest('[data-pk]');if(!b)return;
-    const el=b.closest('.pt'),f=v.formules[+el.dataset.i],code=b.dataset.pk,key=code.toLowerCase(),cs=fCodes(f);
-    f.codes=(cs.some(c=>c.toLowerCase()===key)?cs.filter(c=>c.toLowerCase()!==key):cs.concat(code)).join(', ');
-    $('input[data-k="codes"]',el).value=f.codes;$('.xtra',el).innerHTML=forExtra(f);saveItem();
-    const nb=$(`[data-pk="${CSS.escape(code)}"]`,el);nb&&nb.focus({preventScroll:true})});
+  drawVFor=()=>{const box=$('#vFor');if(!box)return;const rp=lx.find(r=>r.id===v.lieuId);
+    if(rp&&v.f27){const pf=projForm(v,rp);if(fKey(pf)!==fKey(v.formules)){v.formules=pf;saveItem()}}
+    box.innerHTML=`<p class="mute" style="margin:12px 0 0">Les formules sont réglées sur la fiche du site : elles valent pour tous les discours de ce site. Ici, Tiango les traduit en modules.</p>`
+      +(v.formules.length?v.formules.map(f=>{const t=fTot(v,f);return `<div class="pt"><div class="hd"><b class="grow">${esc(f.nom||'Formule')}</b><span class="hr">${mins(t.d)}</span></div><div class="mute" style="margin-top:4px">${esc(fCodes(f).join(' → '))}${f.pour?'<br>'+esc(f.pour):''}</div></div>`}).join(''):'<p class="mute">Aucune formule pour ce site.</p>')
+      +(rp?'<div class="row" style="margin-top:12px"><button type="button" class="btn sec grow" id="vForGo">🧩 Régler les formules sur la fiche du site</button></div>':'');
+    setCnt('v_for',String(v.formules.length));const g=$('#vForGo');if(g)g.onclick=async()=>{await saveItem(true);openLieu(v.lieuId,['vis',v.id],'for')}};
+  drawVFor();
   const stOpts=v.modules.filter(m=>m.code).map(m=>[m.code,m.code+(m.lieu?' — '+m.lieu:'')]);
   editList($('#vFaq'),v.faq,[['stat','Station concernée (vide = visite entière)','select',stOpts],['q','Question','mlt'],['r','Réponse courte','ml']],{lang:L,add:'＋ Ajouter une question',title:x=>ml(x.q,vLang),after:cnt('v_faq',v.faq)});
   editList($('#vAne'),v.anec,[['stat','Station concernée (vide = visite entière)','select',stOpts],['titre','Titre','text'],['statut','Statut','select',['Fait documenté','Tradition locale','Légende','À vérifier']],['texte','Récit','ml']],{lang:L,add:'＋ Ajouter une anecdote',title:x=>x.titre||'Anecdote',after:cnt('v_ane',v.anec)});
@@ -1060,6 +1113,22 @@ async function fillResume(){
     <div class="row" style="margin-top:8px"><button class="btn acc grow" id="rsGo">Reprendre la visite</button><button class="btn sec" id="rsNo">Terminer</button></div></div>`;
   $('#rsNo').onclick=()=>{DB.del('kv','run-vis').catch(()=>{});b.innerHTML=''};
   $('#rsGo').onclick=()=>{vLang=s.lang||vLang;play={seq,i:Math.min(s.i||0,seq.length-1),nom:s.nom,fs:s.fs||19,idx:s.idx};go('visPlay',v.id)}}
+
+/* ---------- fiche du site : formules d'assemblage (suite d'étapes du site) ---------- */
+function drawFor(){const b=$('#forBox');if(!b||!cur)return;const r=cur;
+  const dur=f=>f.steps.reduce((a,id)=>{const p=r.points.find(x=>x.id===id);return a+(p?num(p.duree):0)},0);
+  const pick=f=>{const named=r.points.filter(p=>String(p.nom||'').trim());
+    if(!named.length)return '<p class="mute" style="margin:10px 0 0">Ajoutez d\'abord des étapes au site (section « Étapes de la visite et photos »).</p>';
+    return `<div class="f wide" style="margin-top:10px"><label>Étapes du site : cochez-les dans l'ordre de la visite</label><div class="pks">${named.map(p=>{const k=f.steps.indexOf(p.id),on=k>=0;
+      return `<button type="button" class="pk${on?' on':''}" data-pk="${esc(p.id)}" role="checkbox" aria-checked="${on}"><span class="rk">${on?k+1:''}</span><span class="pkt"><b>${esc(p.nom)}</b>${num(p.duree)?' — '+mins(num(p.duree)):''}</span></button>`}).join('')}</div></div>
+      <div class="row" style="margin-top:10px"><span class="hr">${mins(dur(f))}</span><span class="hr t">${f.steps.length} étape${f.steps.length>1?'s':''}</span></div>
+      <p class="mute" style="margin:6px 0 0;font-size:13px">Les pauses et les repas ne se mettent pas ici : ils s'ajoutent dans le circuit, à l'endroit voulu de la visite.</p>`};
+  editList(b,r.formules,[['nom','Nom de la formule','text'],['pour','Pour qui, dans quel cas','textarea']],{save,add:'＋ Ajouter une formule',blank:()=>({id:uid(),nom:'',pour:'',steps:[]}),title:f=>f.nom||'Formule',extra:pick,after:counts,
+    intro:'Une formule assemble des étapes du site selon la durée disponible. Elle vaut pour tous les discours de ce site.'});
+  b.onclick=e=>{const k=e.target.closest('[data-pk]');if(!k)return;const el=k.closest('.pt'),f=r.formules[+el.dataset.i],id=k.dataset.pk;
+    f.steps=f.steps.includes(id)?f.steps.filter(x=>x!==id):f.steps.concat(id);$('.xtra',el).innerHTML=pick(f);save();
+    const nb=$(`[data-pk="${CSS.escape(id)}"]`,el);nb&&nb.focus({preventScroll:true})};
+  counts()}
 /* ================= ESPACE BUDGETS : coûts, marge, prix de vente ================= */
 const BCAT=['Transport','Entrées et visites','Restauration','Hébergement','Guidage et honoraires','Frais de préparation et repérage','Divers','Imprévus'];
 const BMODE=[['pp','Par participant payant'],['pa','Par personne, accompagnateurs compris'],['fixe','Forfait pour le groupe']];
@@ -1314,15 +1383,21 @@ VIEWS.cir={item:1,back:'cirList',t:()=>esc(item.titre||'Nouveau circuit')+sub2('
       ${inf.length?`<details style="margin-top:8px"><summary class="mute">${inf.length} information${inf.length>1?'s':''} à savoir</summary>${inf.map(a=>`<div class="al info"><b>${esc(a.ico+' '+a.short)}</b> — ${esc(a.lieu)}${a.where?' <span class="mute">('+esc(a.where)+')</span>':''}<div class="mute">${esc(a.txt)}</div></div>`).join('')}</details>`:''}`
       :'<p class="mute" style="margin:0">Ajoutez des sites au programme : leurs contraintes (accessibilité, autocar, fermetures, réservation, guide) remontent ici automatiquement.</p>'};
   /* ----- jours ----- */
+  /* pause ou repas placé dans la visite d'un site : après quelle étape ? */
+  const apSel=(ji,k,ei)=>{const A=c.jours[ji].parts[k],e=A[ei];let q=ei-1;while(q>=0&&(A[q].t==='pause'||A[q].t==='repas'))q--;
+    const pe=q>=0&&A[q].t==='lieu'?A[q]:null,ev=pe&&entVis(pe,V);if(!ev)return '';
+    const seen=new Set(),S=ctiSteps(ev,entForm(pe,ev)).filter(m=>m.ptId&&!seen.has(m.ptId)&&seen.add(m.ptId));if(S.length<2)return '';const r=L.get(pe.lieuId);
+    return `<div class="f wide"><label>Où dans la visite de ${esc(r?lieuNom(r):'ce site')} ?</label><select data-ef="apres"><option value="">Après la visite, à la fin</option>${S.slice(0,-1).map(m=>`<option value="${esc(m.ptId)}"${e.apres===m.ptId?' selected':''}>Après « ${esc(m.lieu||m.code)} »</option>`).join('')}</select></div>`};
   const entryHTML=(e,ji,k,ei,len)=>{const a=`data-j="${ji}" data-p="${k}" data-e="${ei}"`;let b='';
-    const ty=`<select data-ef="t" aria-label="Nature de la ligne">${[['lieu','Lieu'],['libre','Temps libre'],['repas','Repas'],['autre','Autre activité']].map(([v,l])=>`<option value="${v}"${e.t===v?' selected':''}>${l}</option>`).join('')}</select>`;
+    const ty=`<select data-ef="t" aria-label="Nature de la ligne">${[['lieu','Lieu'],['libre','Temps libre'],['pause','Pause'],['repas','Repas'],['autre','Autre activité']].map(([v,l])=>`<option value="${v}"${e.t===v?' selected':''}>${l}</option>`).join('')}</select>`;
     if(e.t==='lieu'){const r=L.get(e.lieuId),fl=r?lieuFlags(r,{date:dayDate(c,ji),part:k,pax:c.pax}):[];
       const vs=e.lieuId?V.filter(x=>x.lieuId===e.lieuId):[],ev=entVis(e,V),ef=entForm(e,ev),auto=entDuree({...e,duree:''},r,V);
       const vSel=vs.length>1?`<div class="f"><label>Discours de visite</label><select data-ef="visId"><option value="">— choisir —</option>${vs.map(x=>`<option value="${esc(x.id)}"${ev&&ev.id===x.id?' selected':''}>${esc((x.nom||'Discours')+(x.public?' · '+x.public:''))}</option>`).join('')}</select></div>`:'',
         fSel=ev&&ev.formules.length?`<div class="f"><label>Formule de visite${vs.length===1?' ('+esc(ev.nom||'discours')+')':''}</label><select data-ef="fId"><option value="">Discours complet${vTot(ev)?' · '+mins(vTot(ev)):''}</option>${ev.formules.map(f=>`<option value="${esc(f.id)}"${ef&&ef.id===f.id?' selected':''}>${esc(f.nom||'Formule')} · ${mins(fTot(ev,f).d)}</option>`).join('')}</select></div>`:'';
       b=`<select data-ef="lieuId" aria-label="Lieu">${lieuOpts(e.lieuId)}</select><div class="grid">${vSel}${fSel}<div class="f"><label>Durée retenue (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}" placeholder="${auto||''}"></div><div class="f"><label>Remarque</label><input data-ef="note" value="${esc(e.note||'')}"></div></div>
        <div class="pills">${pills(fl)}</div>${r?'':e.lieuId?'<div class="box warn">Ce site est introuvable : restaurez-le depuis la corbeille ou choisissez-en un autre.</div>':''}`}
-    else if(e.t==='repas')b=`<select data-ef="presId" aria-label="Restaurant">${presOpts('Restaurant',e.presId)}</select><div class="grid"><div class="f"><label>Prix par personne (€)</label><input data-ef="pu" type="number" inputmode="decimal" min="0" step="any" value="${esc(e.pu||'')}"></div><div class="f"><label>Durée (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}" placeholder="60"></div><div class="f wide"><label>Remarque (menu, allergies, horaire de réservation)</label><input data-ef="note" value="${esc(e.note||'')}"></div></div>`;
+    else if(e.t==='repas')b=`<select data-ef="presId" aria-label="Restaurant">${presOpts('Restaurant',e.presId)}</select><div class="grid"><div class="f"><label>Prix par personne (€)</label><input data-ef="pu" type="number" inputmode="decimal" min="0" step="any" value="${esc(e.pu||'')}"></div><div class="f"><label>Durée (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}" placeholder="60"></div><div class="f wide"><label>Remarque (menu, allergies, horaire de réservation)</label><input data-ef="note" value="${esc(e.note||'')}"></div>${apSel(ji,k,ei)}</div>`;
+    else if(e.t==='pause')b=`<div class="grid"><div class="f wide"><label>Pause (café, toilettes, repos…)</label><input data-ef="note" value="${esc(e.note||'')}" placeholder="Pause café, pause toilettes…"></div><div class="f"><label>Durée (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}"></div>${apSel(ji,k,ei)}</div>`;
     else if(e.t==='autre')b=`<div class="grid"><div class="f wide"><label>Activité (spectacle, dégustation, croisière…)</label><input data-ef="note" value="${esc(e.note||'')}"></div><div class="f"><label>Durée (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}"></div><div class="f"><label>Coût, forfait groupe (€)</label><input data-ef="pu" type="number" inputmode="decimal" min="0" step="any" value="${esc(e.pu||'')}"></div></div>`;
     else b=`<div class="grid"><div class="f wide"><label>Temps libre (à quoi est-il consacré ?)</label><input data-ef="note" value="${esc(e.note||'')}" placeholder="Déjeuner libre, shopping, repos…"></div><div class="f"><label>Durée (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}"></div></div>`;
     return `<div class="en" ${a}><div class="row" style="gap:6px">${ty}<button class="mini" data-ea="up" aria-label="Monter"${ei?'':' disabled'}>↑</button><button class="mini" data-ea="dn" aria-label="Descendre"${ei<len-1?'':' disabled'}>↓</button><button class="mini" data-ea="rm" aria-label="Supprimer cette ligne">🗑</button></div>${b}</div>`};
@@ -1336,7 +1411,7 @@ VIEWS.cir={item:1,back:'cirList',t:()=>esc(item.titre||'Nouveau circuit')+sub2('
         ${j.sejId?'':`<div class="f"><label>Fin de journée : lieu de dépose</label><input data-jf="finAdr" value="${esc(j.finAdr||'')}" placeholder="Gare, parking, adresse…"></div>`}</div>
       <div class="mute" style="margin-top:4px">${c.depart?'<b>'+new Date(dayDate(c,ji)+'T12:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</b> · ':''}${dayTot(j)?'sur place : '+mins(dayTot(j)):'durées non renseignées'}</div>
       ${PARTS.map(([k,lab,ico])=>`<div class="part" data-part="${k}"><h4>${ico} ${lab}</h4>${j.parts[k].length?j.parts[k].map((e,ei)=>entryHTML(e,ji,k,ei,j.parts[k].length)).join(''):'<p class="mute" style="margin:4px 0">Rien de prévu.</p>'}
-        <div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap">${[['lieu','＋ Site'],['repas','＋ Repas'],['libre','＋ Temps libre'],['autre','＋ Autre']].map(([t,l])=>`<button class="btn sec sm" data-add="${t}" data-j="${ji}" data-p="${k}">${l}</button>`).join('')}</div></div>`).join('')}</div>`).join('')
+        <div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap">${[['lieu','＋ Site'],['pause','＋ Pause'],['repas','＋ Repas'],['libre','＋ Temps libre'],['autre','＋ Autre']].map(([t,l])=>`<button class="btn sec sm" data-add="${t}" data-j="${ji}" data-p="${k}">${l}</button>`).join('')}</div></div>`).join('')}</div>`).join('')
       +`<div class="row" style="margin-top:12px"><button class="btn sec grow" id="cAddJ">＋ Ajouter un jour</button></div>`;
     setCnt('k_jr',String(c.jours.length));
     $('#cAddJ').onclick=()=>{c.jours.push(newJour());saveItem(true);drawJ();refresh()}};
@@ -1431,20 +1506,27 @@ function ctiFromDay(c,ji,L,pres,vis,o){
   lg.push({id:uid(),type:'pec',nature:LT.pec[1],lieu:dep?'Prise en charge : '+dep:'',duree:''});
   const addContact=x=>{if(!ct.some(y=>(x.presId&&y.presId===x.presId)||(x.lieuId&&y.lieuId===x.lieuId)))ct.push({id:uid(),...x})};
   if(sejPrev&&sejPrev.presId)addContact({role:'Hébergement',presId:sejPrev.presId,note:'Nuit précédente'});
-  PARTS.forEach(([k,lab])=>j.parts[k].forEach(e=>{
+  const entLine=e=>{if(e.t==='repas'){const p=P(e.presId);if(p)addContact({role:'Restaurant',presId:p.id,note:e.note||''});return {id:uid(),type:'repas',nature:LT.repas[1],lieu:(p&&p.nom)||e.note||'Repas',duree:String(num(e.duree)||60),rem:[p&&p.tel?'Tél. '+p.tel:'',e.note].filter(Boolean).join(' — ')}}
+    return {id:uid(),type:'pause',nature:LT.pause[1],lieu:e.note||'Pause',duree:String(num(e.duree)||'')}};
+  PARTS.forEach(([k,lab])=>{const A=j.parts[k],used=new Set();A.forEach((e,ei)=>{if(used.has(e))return;
     if(e.t==='lieu'){const r=L.get(e.lieuId);if(!r)return;
       lg.push({id:uid(),type:'trajet',nature:LT.trajet[1],lieu:'Vers '+lieuNom(r),duree:'',km:'',itin:r.d.a_itin||'',todo:'Temps et kilométrage de ce trajet à renseigner'});
       const fl=lieuFlags(r,{date,part:k,pax:o.pax}).filter(f=>f.lvl!=='info').map(f=>'⚠ '+f.txt),rem=[...pratiques(r.d).map(x=>x[0]+' : '+x[1]),...fl];
       const v=vis.find(x=>x.id===e.visId&&x.lieuId===r.id)||(o.vm&&r.id in o.vm?vis.find(x=>x.id===o.vm[r.id]):null)||entVis(e,vis),fo=v&&e.fId?v.formules.find(f=>f.id===e.fId):null;
       const arr={id:uid(),type:'arret',nature:LT.arret[1],lieu:lieuNom(r),duree:String(num(e.duree)||(fo?fTot(v,fo).d:v?vTot(v):0)||lieuDuree(r)||''),repId:r.id,visId:v?v.id:'',fId:fo?fo.id:'',contenu:r.d.c_themes||'',rem:rem.join('\n')+(e.note?'\n'+e.note:''),
         todo:'',itin:''};
-      const sb=v&&ctiCanDetail(arr,v)?ctiSubs(arr,v):null,tot=sb?sb.reduce((n,x)=>n+num(x.duree),0):0;
-      if(sb&&(!num(e.duree)||num(e.duree)===tot))lg.push(...sb);else lg.push(arr);   /* détail automatique, sauf durée imposée différente */
+      const ins=[];for(let q=ei+1;q<A.length&&(A[q].t==='pause'||A[q].t==='repas')&&A[q].apres;q++){ins.push(A[q]);used.add(A[q])}
+      const sb=v&&ctiCanDetail(arr,v)?ctiSubs(arr,v):null,tot=sb?sb.reduce((n,x)=>n+num(x.duree),0):0,fs=ins.length&&v?ctiSubs(arr,v):null;
+      if(fs&&fs.length>=2){const out=[...fs],mine=new Set(),tail=[];   /* pause ou repas dans la visite : le détail est coupé après l'étape choisie */
+        ins.forEach(x=>{const L2=entLine(x);let ix=-1;out.forEach((s2,q)=>{const m=s2.modCode&&modByCode(v,s2.modCode);if(m&&m.ptId===x.apres)ix=q});
+          if(ix<0||ix>=out.length-1){tail.push(L2);return}while(mine.has(out[ix+1]))ix++;out.splice(ix+1,0,L2);mine.add(L2)});
+        lg.push(...out,...tail)}
+      else{if(sb&&(!num(e.duree)||num(e.duree)===tot))lg.push(...sb);else lg.push(arr);   /* détail automatique, sauf durée imposée différente */
+        ins.forEach(x=>lg.push(entLine(x)))}
       addContact({role:'Site',lieuId:r.id,note:r.d.contact||''})}
-    else if(e.t==='repas'){const p=P(e.presId);lg.push({id:uid(),type:'repas',nature:LT.repas[1],lieu:(p&&p.nom)||e.note||'Repas',duree:String(num(e.duree)||60),rem:[p&&p.tel?'Tél. '+p.tel:'',e.note].filter(Boolean).join(' — ')});
-      if(p)addContact({role:'Restaurant',presId:p.id,note:e.note||''})}
+    else if(e.t==='repas'||e.t==='pause')lg.push(entLine(e));
     else if(e.t==='libre')lg.push({id:uid(),type:'libre',nature:LT.libre[1],lieu:e.note||'Temps libre',duree:String(num(e.duree)||'')});
-    else lg.push({id:uid(),type:'arret',nature:LT.arret[1],lieu:e.note||'Activité',duree:String(num(e.duree)||'')})}));
+    else lg.push({id:uid(),type:'arret',nature:LT.arret[1],lieu:e.note||'Activité',duree:String(num(e.duree)||'')})})});
   lg.push({id:uid(),type:'fin',nature:LT.fin[1],lieu:fin.txt?(fin.nuit?'Retour : ':'Dépose : ')+fin.txt:'',duree:''});
   if(sejNow&&sejNow.presId)addContact({role:'Hébergement',presId:sejNow.presId,note:'Nuit du jour '+(ji+1)});
   Object.assign(t,{titre:(c.titre||'Circuit')+' — jour '+(ji+1)+(j.titre?' : '+j.titre:''),sous:o.ed,date,debut:j.debut||'09:00',circId:c.id,jour:ji+1,ed:o.ed,lignes:lg,contacts:ct});
@@ -1462,7 +1544,7 @@ function cirModel(c,L,pres,V=[]){
   if(rest.length)B.push({grid:{w:[1800,2400,1600,5000],head:['Niveau','Lieu','Où','Contrainte'],rows:rest.map(a=>[{t:lvlName[a.lvl],b:a.lvl==='bloc',fill:a.lvl==='bloc'?'F8D7D0':'FFF2A8'},a.lieu,a.where,a.txt])}});
   const rows=[];c.jours.forEach((j,ji)=>PARTS.forEach(([k,lab])=>{const A=j.parts[k];if(!A.length)return;A.forEach(e=>{
     const r=e.t==='lieu'?L.get(e.lieuId):null,p=e.presId&&pres.find(x=>x.id===e.presId);
-    const what=e.t==='lieu'?(r?lieuNom(r)+(fo?' — '+(fo.nom||'formule'):''):'(lieu introuvable)'):e.t==='repas'?'Repas'+(p?' — '+p.nom+(p.tel?' ('+p.tel+')':''):'')+(e.note?' — '+e.note:''):e.t==='libre'?'Temps libre'+(e.note?' — '+e.note:''):(e.note||'Activité');
+    const what=e.t==='lieu'?(r?lieuNom(r)+(fo?' — '+(fo.nom||'formule'):''):'(lieu introuvable)'):e.t==='pause'?'Pause'+(e.note?' — '+e.note:''):e.t==='repas'?'Repas'+(p?' — '+p.nom+(p.tel?' ('+p.tel+')':''):'')+(e.note?' — '+e.note:''):e.t==='libre'?'Temps libre'+(e.note?' — '+e.note:''):(e.note||'Activité');
     const d=e.t==='lieu'?entDuree(e,r,V):num(e.duree),fo=e.t==='lieu'?entForm(e,entVis(e,V)):null;
     rows.push([{t:'Jour '+(ji+1)+(j.titre?'\n'+j.titre:''),b:1},lab,{t:what,b:e.t==='lieu'},d?mins(d):'—',r?lieuFlags(r,{date:dayDate(c,ji),part:k,pax:c.pax}).filter(f=>f.lvl!=='info').map(f=>f.short).join(' ; '):''])})}));
   B.push({h2:'Prise en charge et fin de journée'},{grid:{w:[1500,1700,4600,4300],head:['Jour','Prise en charge','Lieu de prise en charge','Fin de journée'],rows:c.jours.map((j,ji)=>{const f=cirFin(c,ji,pres);return [{t:'Jour '+(ji+1)+(j.titre?'\n'+j.titre:''),b:1},j.debut||'—',cirDep(c,ji,pres)||'à préciser',f.txt?(f.nuit?'Nuit : ':'Dépose : ')+f.txt:'à préciser']})}});
@@ -1544,11 +1626,16 @@ function drawContacts(c,pres,reps,sibs){
 /* contraintes des sites d'un CTI : contrôle des jours de fermeture et des horaires d'après le déroulé calculé */
 function ctiFlags(c,reps){const out=[];let t=t2m(c.debut);const pax=parseInt(String(c.h.effectif||'').match(/\d+/)||0,10)||0;
   c.lignes.forEach((l,i)=>{const s=t,e=t+num(l.duree);t=e;if(l.type!=='arret'||!l.repId)return;const r=reps.find(x=>x.id===l.repId);if(!r)return;
-    lieuFlags(r,{date:c.date,pax}).filter(f=>f.lvl!=='info'&&f.cat!=='car'||f.cat==='car'&&f.lvl!=='info').forEach(f=>out.push({...f,lieu:l.lieu||lieuNom(r)}));
+    lieuFlags(r,{date:c.date,pax}).filter(f=>f.lvl!=='info'&&f.cat!=='car'||f.cat==='car'&&f.lvl!=='info').forEach(f=>out.push({...f,repId:r.id,lieu:l.lieu||lieuNom(r)}));
     const o=r.d.h_ouv?t2m(r.d.h_ouv):null,f2=r.d.h_fer?t2m(r.d.h_fer):null;
-    if(o!==null&&s<o)out.push({lvl:'att',cat:'hor',ico:'🕘',short:'Avant l\'ouverture',txt:'Arrivée à '+hm(s)+', le site ouvre à '+hm(o),lieu:l.lieu||lieuNom(r)});
-    if(f2!==null&&num(l.duree)&&e>f2)out.push({lvl:'att',cat:'hor',ico:'🕘',short:'Après la fermeture',txt:'Fin à '+hm(e)+', le site ferme à '+hm(f2),lieu:l.lieu||lieuNom(r)})});
+    if(o!==null&&s<o)out.push({lvl:'att',cat:'hor',ico:'🕘',short:'Avant l\'ouverture',txt:'Arrivée à '+hm(s)+', le site ouvre à '+hm(o),lieu:l.lieu||lieuNom(r),repId:r.id});
+    if(f2!==null&&num(l.duree)&&e>f2)out.push({lvl:'att',cat:'hor',ico:'🕘',short:'Après la fermeture',txt:'Fin à '+hm(e)+', le site ferme à '+hm(f2),lieu:l.lieu||lieuNom(r),repId:r.id})});
   return out.sort((a,b)=>LVL[a.lvl]-LVL[b.lvl])}
+
+/* Contraintes regroupées : la même contrainte d'un site, répétée pour chacun de ses arrêts, n'apparaît qu'une fois ; la case « pris en compte » la retire de la liste et de l'export */
+const flKey=a=>[a.repId||a.lieu,a.cat,a.short,a.txt].join('|');
+function ctiFlagGroups(c,reps){const M=new Map();ctiFlags(c,reps).forEach(a=>{const k=flKey(a);if(!M.has(k))M.set(k,{...a,key:k,lieux:[]});const g=M.get(k);if(a.lieu&&!g.lieux.includes(a.lieu))g.lieux.push(a.lieu)});
+  return [...M.values()].map(g=>({...g,ok:c.fok.includes(g.key)}))}
 
 /* ---------- Import de contacts en nombre : format Tiango, préparé par une IA à partir d'un fichier Excel ---------- */
 const FMT_PRE=`{
@@ -1767,6 +1854,26 @@ async function licInit(){try{const s=await DB.get('kv','licence');LIC=s?await li
 /* prénom et nom du profil : imposés par la licence (démonstration : « Licence » / « Démonstration ») */
 function profilId(){if(LIC.state==='valide'||LIC.state==='expiree'){const t=String(LIC.nom||'').trim().split(/\s+/);return {prenom:t[0]||'',nom:t.slice(1).join(' ')}}return {prenom:'Licence',nom:'Démonstration'}}
 async function profilSync(){const id=profilId();if(profil.prenom!==id.prenom||profil.nom!==id.nom){profil={...profil,...id};try{await DB.put('kv',profil,'profil')}catch(e){}}}
+/* Numéro de version affiché dans « À propos » : à garder identique à la constante V de sw.js (tiango-vNN) */
+const APP_VER='27',APP_MAIL='contact@tiango.fr';
+async function appVers(){try{const k=(await caches.keys()).filter(x=>/^tiango-v/.test(x)).sort();return k.length?k[k.length-1].replace('tiango-v',''):''}catch(e){return ''}}
+function aboutSheet(){
+  $('#modal').innerHTML=sheetHTML('À propos de Tiango',`<div class="box" style="text-align:center"><picture><source srcset="logo-dark.png" media="(prefers-color-scheme:dark)"><img class="brand" src="logo.png" alt="Tiango" style="max-width:180px"></picture>
+    <div style="font-size:26px;font-weight:800;margin-top:6px">Version ${esc(APP_VER)}</div><div class="mute">Tiango V${esc(APP_VER)} · tiango.fr</div></div>
+    <p class="mute" id="abV" style="margin:10px 0 0"></p>
+    <p style="margin:10px 0 0">${esc(licLine())}</p>
+    <p class="mute">Si vous appelez le support, donnez ce numéro de version : il nous permet de savoir exactement ce que vous utilisez.</p>
+    <div class="row" style="margin-top:10px"><button class="btn sec grow" id="abS">🛟 Support et assistance</button></div>`);
+  $('#mNo').onclick=closeModal;$('#abS').onclick=supportSheet;
+  appVers().then(v=>{const e=$('#abV');if(!e)return;e.textContent=v&&v!==APP_VER?`Une version plus récente (V${v}) est installée sur cet appareil : fermez complètement Tiango puis rouvrez-le pour l'utiliser.`:''})}
+function supportSheet(){
+  const info=`Version : Tiango V${APP_VER}\n${licLine()}\nAppareil : ${navigator.userAgent}`,
+    mail=`mailto:${APP_MAIL}?subject=${encodeURIComponent('Support Tiango V'+APP_VER)}&body=${encodeURIComponent('Bonjour,\n\nMon problème ou ma question :\n\n\n\n--- informations techniques (ne pas effacer) ---\n'+info)}`;
+  $('#modal').innerHTML=sheetHTML('Support et assistance',`<p>Une question, un doute, un blocage ? En cas de nécessité, écrivez-nous : nous vous répondons dès que possible.</p>
+    <div class="row" style="margin-top:10px"><a class="btn acc grow" id="suM" href="${esc(mail)}" style="text-align:center;text-decoration:none">✉️ Écrire au support</a></div>
+    <p class="mute" style="margin-top:10px">Le message s'ouvre dans votre messagerie, avec la version de Tiango déjà indiquée. Adresse : <a href="mailto:${APP_MAIL}">${APP_MAIL}</a></p>
+    <p class="mute">Vos données restent sur votre appareil : Tiango ne les envoie jamais. Si vous nous écrivez à propos d'un fichier, joignez-le à votre message.</p>`);
+  $('#mNo').onclick=closeModal}
 const licLine=()=>LIC.state==='valide'?'Licence Tiango : '+LIC.nom+', valable jusqu\'au '+frDate(LIC.exp):'Version de démonstration de Tiango : tiango.fr';
 /* autorise la création d'un élément : licence valide, ou quota de démonstration non atteint */
 async function gate(key,need=1){
@@ -1801,7 +1908,7 @@ const FMT_VIS=`{
  "public": "", "fil_rouge": "", "presentation": "",
  "fiche_pratique": [{"rubrique": "Horaires", "contenu": ""}],
  "modules": [{
-   "code": "M0", "type": "station | pause | repas | extension", "lieu": "lieu précis de l'arrêt",
+   "code": "M0", "type": "station | extension", "lieu": "lieu précis de l'arrêt",
    "duree_min": 10, "parole_min": 4,
    "a_voir": "", "message_cle": "", "placement_groupe": "", "consigne": "indication de conduite pour le guide, jamais prononcée",
    "titre": {"fr": "", "en": "", "es": ""},
@@ -1855,7 +1962,7 @@ const FMT_CIR=`{
  "jours": [{
    "titre": "", "debut": "HH:MM",
    "parties": {
-     "matin": [{"type": "lieu | repas | temps_libre | activite", "lieu": "nom exact du site (type lieu)", "duree_min": 90, "remarque": ""}],
+     "matin": [{"type": "lieu | pause | repas | temps_libre | activite", "lieu": "nom exact du site (type lieu)", "duree_min": 90, "remarque": ""}],
      "apres_midi": [],
      "soiree": []
    },
@@ -1914,11 +2021,11 @@ ${d.pts}
 ${d.compl?`
 MODULES DÉJÀ EXISTANTS (ne les reprends pas, ne les modifie pas, ne les remplace pas) :
 ${d.exist}
-Numérote tes nouveaux modules à partir de ${d.nextCode} (M pour une station, P pour une pause, EXT- pour une extension) pour ne pas reprendre un code existant.${d.angle?'\nFil rouge du discours existant, à respecter pour le ton : '+d.angle:''}
+Numérote tes nouveaux modules à partir de ${d.nextCode} (M pour une station, EXT- pour une extension ; pas de pause ni de repas : ils se placent dans le circuit) pour ne pas reprendre un code existant.${d.angle?'\nFil rouge du discours existant, à respecter pour le ton : '+d.angle:''}
 Laisse vides (tableaux vides, chaînes vides) toutes les rubriques qui ne concernent pas ces nouveaux modules : fiche pratique, formules, sécurité, plan B, glossaire. Des questions fréquentes ou des anecdotes ne sont attendues que si elles concernent ces nouveaux points.`:'Si un point mérite plusieurs discours, fais plusieurs modules. N\'ajoute un module hors de cette liste que s\'il est indispensable (accueil, pause) ; le guide ajoutera lui-même les autres.'}`:''}
 
 CE QUI EST ATTENDU
-- Un parcours découpé en modules autonomes (M0 accueil et consignes, M1, M2… ; P1 pour les pauses ; EXT-A… pour les extensions), chacun avec un site précis, une durée sur place, un temps de parole, ce que l'on voit, un message clé et l'endroit où placer le groupe.
+- Un parcours découpé en modules autonomes (M0 accueil et consignes, M1, M2… ; EXT-A… pour les extensions ; ni pause ni repas, qui se placent dans le circuit), chacun avec un site précis, une durée sur place, un temps de parole, ce que l'on voit, un message clé et l'endroit où placer le groupe.
 - Pour chaque module, le discours complet dans chaque langue demandée : un texte écrit pour être dit, pas lu — phrases courtes, présent de narration, adresse directe au groupe. Chaque langue est rédigée pour son public, pas traduite mot à mot.
 - Deux ou trois formules qui assemblent les modules selon la durée disponible.
 - Les consignes de sécurité à dire au groupe, des questions fréquentes avec réponse courte, des anecdotes (en précisant pour chacune : fait documenté, tradition locale ou légende), un plan B (pluie, fermeture, retard), les erreurs courantes à ne pas dire, un glossaire, les sources.
@@ -1958,11 +2065,11 @@ async function aiSheet(kind,o={}){
       const L_=d.compl?visMiss(ex,r):(r.points||[]).filter(p=>String(p.nom||'').trim());
       d.pts=L_.map(p=>'- '+String(p.nom).trim()+(p.duree?' ('+p.duree+' min)':'')+(p.note?' — '+String(p.note).replace(/\s+/g,' ').trim():'')).join('\n');
       if(d.compl){d.exist=ex.modules.map(m=>'- '+[m.code,m.lieu].filter(Boolean).join(' : ')).join('\n');d.angle=ex.angle||'';d.nextCode=nextMCode(ex)}}}
-  if(V)d.role='conf';
+  if(V)d.role='acc';
   if(kind==='cir')d.noms=(await live('reps')).map(fixRep).filter(r=>!r.ctiId).map(r=>'- '+lieuNom(r)+(r.d.ville?' ('+r.d.ville+')':'')).join('\n');
   const F=kind==='lieu'?[['sujet','Site à décrire (ex. Abbaye du Mont-Saint-Michel)','text','wide'],['lieu','Ville, pays','text'],['plus','Précisions (ce que vous savez déjà, ce qui vous intéresse)','textarea']]
     :kind==='cir'?[['sujet','Circuit (ex. Bretagne nord en 3 jours)','text','wide'],['lieu','Secteur, villes à relier','text'],['duree','Nombre de jours, période','text'],['public','Clients, effectif, transport','text'],['plus','Précisions (lieux imposés, contraintes, rythme)','textarea']]
-    :V?[['role','Rôle du guide','select',[['conf','Guide-conférencier : conduit la visite, discours approfondi'],['acc','Guide accompagnateur : accompagne le groupe, repères et relais']]],['sujet','Site à présenter (ex. Cathédrale Notre-Dame de Paris)','text','wide'],['lieu','Ville, pays','text'],['langues','Langues du discours','text'],['duree','Durée visée','text'],['public','Public','text'],['plus','Précisions (angle, contraintes, ce que vous savez déjà)','textarea']]
+    :V?[['role','Rôle du guide','select',[['acc','Guide accompagnateur : accompagne le groupe, repères et relais'],['conf','Guide-conférencier : conduit la visite, discours approfondi']]],['sujet','Site à présenter (ex. Cathédrale Notre-Dame de Paris)','text','wide'],['lieu','Ville, pays','text'],['langues','Langues du discours','text'],['duree','Durée visée','text'],['public','Public','text'],['plus','Précisions (angle, contraintes, ce que vous savez déjà)','textarea']]
     :[['sujet','Prestation (ex. Excursion côte sud de Séné)','text','wide'],['lieu','Secteur, communes traversées','text'],['duree','Date, heure de début et de fin','text'],['public','Clients, effectif, moyen de transport','text'],['plus','Précisions (arrêts souhaités, contraintes)','textarea']];
   if(V)d.langues='fr, en, es';
   $('#modal').innerHTML=`<div class="modal"><div class="sheet"><h2>Faire rédiger par une IA</h2>
@@ -2114,7 +2221,7 @@ async function cirImport(j){
     let r=reps.find(x=>strip(lieuNom(x)).trim()===k)||reps.find(x=>{const n=strip(lieuNom(x)).trim();return n.length>4&&k.length>4&&(n.includes(k)||k.includes(n))});
     if(!r){r={id:uid(),created:Date.now(),updated:Date.now(),d:{site:St(nm).trim(),pays:'France',notes:'Fiche créée par l\'import d\'un circuit : à compléter (horaires, tarifs, accessibilité…).'},gps:null,points:[],bud:[],np:0,nd:0,cover:''};mk.push(r);reps.push(r)}
     made.set(k,r);return r};
-  const TY={lieu:'lieu',repas:'repas',temps_libre:'libre',libre:'libre',activite:'autre','activité':'autre',autre:'autre'};
+  const TY={lieu:'lieu',pause:'pause',repas:'repas',temps_libre:'libre',libre:'libre',activite:'autre','activité':'autre',autre:'autre'};
   const ent=e=>{e=O(e);const t=TY[strip(St(e.type)).replace(/[\s-]+/g,'_')]||(e.lieu?'lieu':'libre');const o={id:uid(),t,lieuId:'',presId:'',duree:e.duree_min?St(e.duree_min):'',note:St(e.remarque),pu:''};
     if(t==='lieu'){const r=find(e.lieu);o.lieuId=r?r.id:'';if(!r)o.t='libre'}else if(t!=='lieu'&&e.lieu&&!o.note)o.note=St(e.lieu);return o};
   const sej=A(j.sejours).map(x=>{x=O(x);return {id:uid(),type:SEJ_TYPES.includes(St(x.type))?St(x.type):'Hôtel',nom:St(x.nom),presId:'',mode:/forfait|groupe/.test(strip(St(x.calcul)))?'fixe':'pa',pu:x.prix_nuit?St(x.prix_nuit):'',note:St(x.remarque)}});
@@ -2520,6 +2627,8 @@ $('#bMenu').onclick=async()=>{
    <button class="btn sec" id="m2">💾 Sauvegarder toutes mes données</button>
    <button class="btn sec" id="m3">📥 Importer (sauvegarde, site à visiter ou CTI)</button>
    <button class="btn sec" id="m7">🔑 Licence${LIC.state==='valide'?' : '+esc(LIC.nom):' (démonstration)'}</button>
+   <button class="btn sec" id="m11">ℹ️ À propos de Tiango (V${APP_VER})</button>
+   <button class="btn sec" id="m12">🛟 Support et assistance</button>
    <button class="btn sec" id="m9">💶 Budgets et prix de vente</button>
    <button class="btn sec" id="m10">📇 Annuaire des prestataires</button>
    <button class="btn sec" id="m4"${n>1?'':' disabled'}>🧭 Synthèse des sites</button>
@@ -2534,7 +2643,7 @@ $('#bMenu').onclick=async()=>{
   $('#mNo').onclick=closeModal;$('#m1').onclick=editProfil;
   $('#m2').onclick=doBackup;
   $('#m3').onclick=()=>importSheet();
-  $('#m4').onclick=()=>{closeModal();go('syn')};$('#m7').onclick=()=>licSheet();$('#m9').onclick=()=>{closeModal();go('budList')};$('#m10').onclick=()=>{closeModal();go('preList')};
+  $('#m4').onclick=()=>{closeModal();go('syn')};$('#m7').onclick=()=>licSheet();$('#m11').onclick=aboutSheet;$('#m12').onclick=supportSheet;$('#m9').onclick=()=>{closeModal();go('budList')};$('#m10').onclick=()=>{closeModal();go('preList')};
   $('#m5').onclick=()=>trashSheet();
 };
 
