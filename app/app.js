@@ -224,7 +224,8 @@ function summary(r,fl){const ph=fl.filter(f=>f.kind==='photo').sort((a,b)=>a.t-b
 const VIEWS={};
 let leave=null;                       /* nettoyage à faire en quittant l'écran courant */
 async function go(v,id){
-  if(!(await flushAll()))return unsavedBox(()=>go(v,id));   /* écriture refusée : la saisie reste à l'écran, l'utilisateur décide */
+  if(!(await flushAll()))return unsavedBox(()=>go(v,id));
+  if(view==='edit')await syncDur();   /* écriture refusée : la saisie reste à l'écran, l'utilisateur décide */
   const V=VIEWS[v];let ni=null,nc=null,nf=null;
   if(id){
     if(V.item){ni=await DB.get('items',id);if(!ni||ni.deleted){toast('Cet élément n\'existe plus sur cet appareil');return go(V.back)}}
@@ -632,7 +633,7 @@ function delItem(label){confirmBox('Supprimer '+label+' ?','L\'élément part à
 async function dupItem(){if(!(await gate(item.kind)))return;await flushAll();const c=JSON.parse(JSON.stringify(item));c.id=uid();c.updated=Date.now();
   if(c.kind==='vis'||c.kind==='pre')c.nom=(c.nom||(c.kind==='vis'?'Discours':'Prestataire'))+' (copie)';else c.titre=(c.titre||({cti:'CTI',cir:'Circuit',rpg:'Repérage'}[c.kind]||'Budget'))+' (copie)';
   if(c.kind==='cir'){const m={};c.sejours.forEach(x=>{const n=uid();m[x.id]=n;x.id=n});c.jours.forEach(j=>{j.id=uid();j.sejId=m[j.sejId]||'';PARTS.forEach(([k])=>j.parts[k].forEach(e=>e.id=uid()))});c.bud.forEach(l=>l.id=uid())}
-  if(c.kind==='cti'){c.contacts.forEach(k=>k.id=uid())}
+  if(c.kind==='cti'){c.contacts.forEach(k=>k.id=uid());c.run=null;c.hist=[]}
   if(c.kind==='cti'){c.repId='';delete c.run;delete c.hist;c.lignes.forEach(l=>{l.id=uid();delete l.docs;delete l.obs;delete l.prevu;delete l.releve})}
   if(c.kind==='bud')c.lignes.forEach(l=>l.id=uid());
   await DB.put('items',c);toast('Copie créée');go(c.kind,c.id)}
@@ -725,7 +726,7 @@ VIEWS.cti={item:1,back:'ctiList',t:()=>esc(item.titre||'Nouveau CTI')+sub2('Cadr
     cir=c.circId?allI.find(i=>i.kind==='cir'&&i.id===c.circId):null,sibs=c.ed?allI.filter(i=>i.kind==='cti'&&i.id!==c.id&&i.circId===c.circId&&i.ed===c.ed&&i.contacts.length):[];
   if(item!==c||view!=='cti')return;
   if(!OPEN.has('c_init')){OPEN.add('c_init');OPEN.add(c.titre?'c_der':'c_id')}
-  $('#main').innerHTML=`<div class="card"><div class="row"><button class="btn acc grow" id="cRun"${c.lignes.length?'':' disabled'}>▶ ${obj(c.run).t0?(c.run.done?'Bilan de la conduite':'Reprendre la conduite'):'Conduire la prestation'}</button></div>
+  $('#main').innerHTML=`<div class="card"><div class="row"><button class="btn acc grow" id="cRun"${c.lignes.length?'':' disabled'}>🚩 ${obj(c.run).t0?(c.run.done?'Guidage : bilan de la prestation':'Guidage : reprendre la conduite'):'Ouvrir le guidage'}</button></div>
     <div class="row" style="margin-top:10px"><button class="btn grow" id="cPv">📄 Aperçu et export</button><button class="btn sec grow" id="cChk">✔ Vérifier avant le départ</button><button class="btn sec grow" id="cRep">🧭 ${c.repId?'Ouvrir le repérage':'Préparer le repérage'}</button></div>
     ${c.repId?'<div class="row" style="margin-top:10px"><button class="btn sec grow" id="cGet">↩ Reporter les relevés du repérage dans le CTI</button></div>':''}
     <div class="box" id="cBil"></div><div id="cFl"></div>${cir?`<div class="row" style="margin-top:10px"><button class="btn sec grow" id="cCir">🧭 Ouvrir le circuit : ${esc(cir.titre||'sans titre')}${c.jour?' (jour '+num(c.jour)+')':''}</button></div>`:''}</div>
@@ -781,7 +782,13 @@ VIEWS.cti={item:1,back:'ctiList',t:()=>esc(item.titre||'Nouveau CTI')+sub2('Cadr
      intro:'Le groupe est accompagné par le guide, éventuellement un second guide, et le chauffeur du car, qui compte aussi comme accompagnateur. Le nom peut être saisi librement.'});
   bilan();
   if($('#cCir'))$('#cCir').onclick=()=>go('cir',c.circId);
-  $('#cRun').onclick=()=>go('ctiRun');
+  $('#cRun').onclick=()=>{guiBack=['cti',c.id];go('ctiRun')};
+  /* CTI verrouillé tant que son guidage est en cours */
+  if(guiState(c)==='cours'){
+    $('#main').insertAdjacentHTML('afterbegin',`<div class="box warn keep" style="margin-top:12px"><b class="l">🔒 Guidage en cours : ce CTI n'est plus modifiable</b>Pour le modifier, faites-en une copie : elle aura son propre guidage.<div class="row" style="margin-top:10px"><button type="button" class="btn sm grow" id="cLg">🚩 Ouvrir le guidage</button><button type="button" class="btn sec sm grow" id="cLd">⧉ Créer une copie modifiable</button></div></div>`);
+    $$('#main input,#main select,#main textarea').forEach(e=>e.disabled=true);
+    $$('#main button').forEach(b=>{if(!b.closest('.keep')&&!['cRun','cPv','cChk'].includes(b.id))b.disabled=true});
+    $('#cLg').onclick=()=>{guiBack=['cti',c.id];go('ctiRun')};$('#cLd').onclick=dupItem}
   $('#iDel').onclick=()=>delItem('ce CTI');$('#iDup').onclick=dupItem;
   $('#cPv').onclick=()=>preview({title:c.titre||'CTI',name:'CTI_'+slug(c.titre)+(c.date?'_'+c.date:''),blocks:ctiModel(c,{pres,reps}),landscape:true,back:'cti'});
   $('#cSun').onclick=async()=>{let g=null;if(c.repId){const r=await DB.get('reps',c.repId);g=r&&(r.gps||(r.points.find(p=>p.gps)||{}).gps)}
@@ -832,10 +839,11 @@ function ctiModel(c,x={}){
   const CT=c.contacts.map(ct=>{const I=contactInfo(ct,x.pres||[],x.reps||[]);return [ct.role||'',I.nom+(I.det?'\n'+I.det:''),I.tel,ct.note||'']});
   if(CT.length)B.push({h2:'Contacts'},{grid:{w:[1800,4200,2600,4400],head:['Rôle','Nom','Téléphone','Remarque'],rows:CT}});
   const FL=ctiFlags(c,x.reps||[]);if(FL.length)B.push({h2:'Contraintes des sites à traiter'},{grid:{w:[1600,3000,3000,6400],head:['Niveau','Lieu','Contrainte','Détail'],rows:FL.map(a=>[{t:lvlName[a.lvl],b:a.lvl==='bloc',fill:a.lvl==='bloc'?'F8D7D0':'FFF2A8'},a.lieu,a.short,a.txt])}});
-  if(c.lignes.length){B.push({h2:'Déroulé horaire'},{grid:{w:[1100,700,1900,2300,850,1300,3700,3288],
-    head:['Horaire','Durée','Étape / lieu','Itinéraire à suivre','Km (étape / cumul)','Nature du temps','Contenu / thème du commentaire','Remarques : sécurité, stationnement, WC, PMR, impératifs'],
-    rows:c.lignes.map((l,i)=>[{t:k.rows[i].hor+(k.rows[i].att?'\n(attente '+k.rows[i].att+' min)':''),b:1},num(l.duree)?num(l.duree)+' min':'—',{t:(l.type==='arret'?'ARRÊT — ':l.type==='trajet'?'Trajet : ':'')+(l.lieu||(LT[l.type]||LT.arret)[0]),b:l.type==='arret'},l.itin||'',k.rows[i].km,l.nature||(LT[l.type]||LT.arret)[1],l.contenu||'',
-      {t:[l.rem,l.obs&&'Constat du repérage : '+l.obs,l.todo&&'À VÉRIFIER SUR PLACE : '+l.todo].filter(Boolean).join('\n'),fill:l.todo?'FFF2A8':undefined}])}},{p:'Bilan temps : '+ctiBilan(k)+'.'})}
+  if(c.lignes.length){const tr=c.lignes.filter(l=>l.type==='trajet').reduce((n,l)=>n+num(l.duree),0),ar=c.lignes.filter(l=>l.type!=='trajet').reduce((n,l)=>n+num(l.duree),0);
+    B.push({h2:'Déroulé horaire'},{grid:{w:[1200,2600,3600,1100,1000,1000,4638],
+    head:['Horaire','Étape / lieu','Itinéraire à suivre','Km (étape / cumul)','Durée du trajet','Durée de l\'arrêt','Remarques : sécurité, stationnement, WC, PMR, impératifs'],
+    rows:c.lignes.map((l,i)=>[{t:k.rows[i].hor+(k.rows[i].att?'\n(attente '+k.rows[i].att+' min)':''),b:1},{t:(l.type==='arret'?'ARRÊT — ':l.type==='trajet'?'Trajet : ':'')+(l.lieu||(LT[l.type]||LT.arret)[0]),b:l.type==='arret'||l.type==='repas'},l.itin||'',k.rows[i].km,l.type==='trajet'&&num(l.duree)?num(l.duree)+' min':'',l.type!=='trajet'&&num(l.duree)?num(l.duree)+' min':'',
+      {t:[l.rem,l.obs&&'Constat du repérage : '+l.obs,l.todo&&'À VÉRIFIER SUR PLACE : '+l.todo].filter(Boolean).join('\n'),fill:l.todo?'FFF2A8':undefined}]).concat([['Total','','','',tr?mins(tr):'',ar?mins(ar):'','']].map(r=>r.map((t,j)=>j===0||j>=4?{t,b:1}:t)))}},{p:'Bilan temps : '+ctiBilan(k)+'.'})}
   const DJ=c.lignes.map((l,i)=>({l,i})).filter(({l})=>(l.docs&&l.docs.length)||l.imp||l.bon||l.conf||l.lim||l.eff||l.conv||l.a_dep||l.a_park||l.a_ent||l.a_rdv);
   if(DJ.length)B.push({h2:'Dossier du jour et plan d\'accès'},{grid:{w:[1100,2300,1500,2100,1800,2200,3400],head:['Horaire','Étape','Horaire impératif','Confirmation / bon','Effectif / date limite','Plan : dépose · stationnement · entrée · rendez-vous','Consignes convenues'],
     rows:DJ.map(({l,i})=>[{t:k.rows[i].hor,b:1},lab(l),l.imp?{t:'IMPÉRATIF'+(l.hfix?' '+hm(t2m(l.hfix)):''),b:1,fill:'F8D7D0'}:'souple',[l.conf,l.bon,...(l.docs||[]).map(d=>'Justificatif : '+d.name)].filter(Boolean).join('\n'),[ctiEff(c,i)&&'Attendu : '+ctiEff(c,i),l.lim&&'Limite : '+frDate(l.lim)].filter(Boolean).join('\n'),[l.a_dep&&'Dépose : '+l.a_dep,l.a_park&&'Stationnement : '+l.a_park,l.a_ent&&'Entrée : '+l.a_ent,l.a_rdv&&'Rendez-vous : '+l.a_rdv].filter(Boolean).join('\n'),l.conv||''])}});
@@ -857,6 +865,15 @@ const modByCode=(v,code)=>v.modules.find(m=>(m.code||'').trim().toLowerCase()===
 const dupCodes=v=>{const c={};v.modules.forEach(m=>{const k=(m.code||'').trim().toLowerCase();if(k)c[k]=(c[k]||0)+1});return Object.keys(c).filter(k=>c[k]>1)};
 const fCodes=f=>String(f.codes||'').split(/[,;→>·\n]+/).map(s=>s.trim()).filter(Boolean);
 const fSeq=(v,f)=>fCodes(f).map(c=>modByCode(v,c)).filter(Boolean);
+const vTot=v=>v.modules.filter(m=>m.type!=='extension').reduce((a,m)=>a+num(m.duree),0);
+/* Les durées des étapes du site pilotent celles des modules du discours (donc des formules et des circuits). Un module garde sa durée tant que l'étape du site n'a pas changé depuis la dernière synchronisation. Les CTI ne sont jamais touchés : leur durée reste libre. */
+async function syncDur(){
+  try{const reps=(await live('reps')).map(fixRep),L=new Map(reps.map(r=>[r.id,r])),its=(await live('items')).filter(i=>i.kind==='vis').map(fixItem);let n=0;
+    for(const v of its){const r=L.get(v.lieuId);if(!r)continue;let ch=false;
+      v.modules.forEach(m=>{const p=(r.points||[]).find(p=>modCovers(m,p));if(!p||blank(p.duree)||!num(p.duree))return;
+        const pd=String(num(p.duree));if(m.ptD===pd)return;m.ptD=pd;if(String(num(m.duree))!==pd||blank(m.duree))m.duree=pd;if(!m.ptId)m.ptId=p.id;ch=true});
+      if(ch){v.updated=Date.now();await DB.put('items',v);n++}}
+    return n}catch(e){return 0}}
 const fTot=(v,f)=>{const s=fSeq(v,f);return {n:s.length,d:s.reduce((a,m)=>a+num(m.duree),0),p:s.reduce((a,m)=>a+num(m.parole),0)}};
 
 VIEWS.visList={top:1,t:()=>'Tiango '+sub2('Discours de visite'),r:()=>{visBack=null;return renderItems('vis')}};
@@ -1225,7 +1242,7 @@ NEW.cir=()=>({id:uid(),kind:'cir',updated:Date.now(),titre:'',desc:'',pax:'20',a
 /* discours et formule choisis pour un site du programme */
 const entVis=(e,V)=>{const vs=e.lieuId?V.filter(x=>x.lieuId===e.lieuId):[];return vs.find(x=>x.id===e.visId)||(vs.length===1?vs[0]:null)};
 const entForm=(e,v)=>v&&e.fId?(v.formules.find(f=>f.id===e.fId)||null):null;
-const entDuree=(e,r,V)=>{if(num(e.duree))return num(e.duree);if(e.t!=='lieu')return 0;const v=entVis(e,V),f=entForm(e,v),t=f?fTot(v,f).d:0;return t||(r?lieuDuree(r):0)};
+const entDuree=(e,r,V)=>{if(num(e.duree))return num(e.duree);if(e.t!=='lieu')return 0;const v=entVis(e,V),f=entForm(e,v),t=f?fTot(v,f).d:v?vTot(v):0;return t||(r?lieuDuree(r):0)};
 /* lieu de prise en charge et de fin de journée */
 const depEff=(c,ji)=>{const j=c.jours[ji];if(j.depSrc)return j.depSrc;return ji>0&&!j.depAdr&&c.jours[ji-1].sejId?'prev':''};
 const sejTxt=(c,s,pres)=>{if(!s)return '';const p=pres.find(x=>x.id===s.presId);return (p&&p.nom)||s.nom||'Hébergement'};
@@ -1302,7 +1319,7 @@ VIEWS.cir={item:1,back:'cirList',t:()=>esc(item.titre||'Nouveau circuit')+sub2('
     if(e.t==='lieu'){const r=L.get(e.lieuId),fl=r?lieuFlags(r,{date:dayDate(c,ji),part:k,pax:c.pax}):[];
       const vs=e.lieuId?V.filter(x=>x.lieuId===e.lieuId):[],ev=entVis(e,V),ef=entForm(e,ev),auto=entDuree({...e,duree:''},r,V);
       const vSel=vs.length>1?`<div class="f"><label>Discours de visite</label><select data-ef="visId"><option value="">— choisir —</option>${vs.map(x=>`<option value="${esc(x.id)}"${ev&&ev.id===x.id?' selected':''}>${esc((x.nom||'Discours')+(x.public?' · '+x.public:''))}</option>`).join('')}</select></div>`:'',
-        fSel=ev&&ev.formules.length?`<div class="f"><label>Formule de visite${vs.length===1?' ('+esc(ev.nom||'discours')+')':''}</label><select data-ef="fId"><option value="">Discours complet${ev.modules.length?' · '+mins(ev.modules.reduce((a,m)=>a+num(m.duree),0)||0):''}</option>${ev.formules.map(f=>`<option value="${esc(f.id)}"${ef&&ef.id===f.id?' selected':''}>${esc(f.nom||'Formule')} · ${mins(fTot(ev,f).d)}</option>`).join('')}</select></div>`:'';
+        fSel=ev&&ev.formules.length?`<div class="f"><label>Formule de visite${vs.length===1?' ('+esc(ev.nom||'discours')+')':''}</label><select data-ef="fId"><option value="">Discours complet${vTot(ev)?' · '+mins(vTot(ev)):''}</option>${ev.formules.map(f=>`<option value="${esc(f.id)}"${ef&&ef.id===f.id?' selected':''}>${esc(f.nom||'Formule')} · ${mins(fTot(ev,f).d)}</option>`).join('')}</select></div>`:'';
       b=`<select data-ef="lieuId" aria-label="Lieu">${lieuOpts(e.lieuId)}</select><div class="grid">${vSel}${fSel}<div class="f"><label>Durée retenue (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}" placeholder="${auto||''}"></div><div class="f"><label>Remarque</label><input data-ef="note" value="${esc(e.note||'')}"></div></div>
        <div class="pills">${pills(fl)}</div>${r?'':e.lieuId?'<div class="box warn">Ce site est introuvable : restaurez-le depuis la corbeille ou choisissez-en un autre.</div>':''}`}
     else if(e.t==='repas')b=`<select data-ef="presId" aria-label="Restaurant">${presOpts('Restaurant',e.presId)}</select><div class="grid"><div class="f"><label>Prix par personne (€)</label><input data-ef="pu" type="number" inputmode="decimal" min="0" step="any" value="${esc(e.pu||'')}"></div><div class="f"><label>Durée (min)</label><input data-ef="duree" type="number" inputmode="numeric" min="0" value="${esc(e.duree||'')}" placeholder="60"></div><div class="f wide"><label>Remarque (menu, allergies, horaire de réservation)</label><input data-ef="note" value="${esc(e.note||'')}"></div></div>`;
@@ -1419,7 +1436,7 @@ function ctiFromDay(c,ji,L,pres,vis,o){
       lg.push({id:uid(),type:'trajet',nature:LT.trajet[1],lieu:'Vers '+lieuNom(r),duree:'',km:'',itin:r.d.a_itin||'',todo:'Temps et kilométrage de ce trajet à renseigner'});
       const fl=lieuFlags(r,{date,part:k,pax:o.pax}).filter(f=>f.lvl!=='info').map(f=>'⚠ '+f.txt),rem=[...pratiques(r.d).map(x=>x[0]+' : '+x[1]),...fl];
       const v=vis.find(x=>x.id===e.visId&&x.lieuId===r.id)||(o.vm&&r.id in o.vm?vis.find(x=>x.id===o.vm[r.id]):null)||entVis(e,vis),fo=v&&e.fId?v.formules.find(f=>f.id===e.fId):null;
-      const arr={id:uid(),type:'arret',nature:LT.arret[1],lieu:lieuNom(r),duree:String(num(e.duree)||(fo?fTot(v,fo).d:0)||lieuDuree(r)||''),repId:r.id,visId:v?v.id:'',fId:fo?fo.id:'',contenu:r.d.c_themes||'',rem:rem.join('\n')+(e.note?'\n'+e.note:''),
+      const arr={id:uid(),type:'arret',nature:LT.arret[1],lieu:lieuNom(r),duree:String(num(e.duree)||(fo?fTot(v,fo).d:v?vTot(v):0)||lieuDuree(r)||''),repId:r.id,visId:v?v.id:'',fId:fo?fo.id:'',contenu:r.d.c_themes||'',rem:rem.join('\n')+(e.note?'\n'+e.note:''),
         todo:'',itin:''};
       const sb=v&&ctiCanDetail(arr,v)?ctiSubs(arr,v):null,tot=sb?sb.reduce((n,x)=>n+num(x.duree),0):0;
       if(sb&&(!num(e.duree)||num(e.duree)===tot))lg.push(...sb);else lg.push(arr);   /* détail automatique, sauf durée imposée différente */
@@ -1968,9 +1985,29 @@ function importSheet(){
   $('#mNo').onclick=closeModal;$('#impFile').onclick=()=>{const i=$('#fImp');i.value='';i.click()};
   $('#impGo').onclick=async()=>{const t=$('#impTxt').value;if(!t.trim())return toast('Collez d\'abord le texte à importer');try{await importAny(t);}catch(x){toast('Import impossible : '+x.message,6000)}};
 }
+/* Réponses d'IA : guillemets typographiques (“ ” « » „), virgules finales, retours à la ligne dans les textes… on répare au lieu de refuser */
+function fixJson(s){
+  const Q='\u201c\u201d\u201e',nx=i=>{while(i<s.length&&/\s/.test(s[i]))i++;return i};
+  let o='',m=0;   /* m : 0 hors texte, 1 texte entre guillemets droits, 2 texte entre guillemets typographiques */
+  for(let i=0;i<s.length;i++){const ch=s[i];
+    if(m===0){
+      if(ch==='"'){m=1;o+='"'}
+      else if(Q.includes(ch)||ch==='\u00ab'&&/[:,\[{]\s*$/.test(o)){m=2;o+='"'}
+      else if(ch===','){const k=nx(i+1);if(s[k]==='}'||s[k]===']')continue;o+=ch}
+      else if(ch==='\u00a0'||ch==='\u202f')o+=' ';
+      else o+=ch}
+    else if(ch==='\\'){o+=ch+(s[i+1]||'');i++}
+    else if(m===1){if(ch==='"')m=0;if(ch==='\n'||ch==='\r'){if(ch==='\n')o+='\\n'}else o+=ch}
+    else{
+      if(Q.includes(ch)||ch==='\u00bb'){const k=nx(i+1);if(k>=s.length||',:}]'.includes(s[k])){m=0;o+='"'}else o+=ch}
+      else if(ch==='"')o+='\\"';
+      else if(ch==='\n'||ch==='\r'){if(ch==='\n')o+='\\n'}
+      else o+=ch}}
+  return o}
+function parseIA(t){try{return JSON.parse(t)}catch(e){return JSON.parse(fixJson(t))}}
 async function importAny(text){
   const a=text.indexOf('{'),b=text.lastIndexOf('}');if(a<0||b<a)throw new Error('aucune donnée au format Tiango dans ce texte');
-  let j;try{j=JSON.parse(text.slice(a,b+1))}catch(e){throw new Error('le texte est incomplet ou mal formé (réponse de l\'IA coupée ?). Demandez-lui de renvoyer le JSON complet')}
+  let j;try{j=parseIA(text.slice(a,b+1))}catch(e){throw new Error('le texte est incomplet ou mal formé (réponse de l\'IA coupée ?). Demandez-lui de renvoyer le JSON complet')}
   if(!j||typeof j!=='object')throw new Error('format non reconnu');
   if(j.app==='reperage-guide'){closeModal();return importBackup(j)}
   if(j.format==='tiango-annuaire'){closeModal();return preImport(j)}
@@ -2140,7 +2177,7 @@ const lab=l=>(LT[l.type]||LT.arret)[0]+(l.lieu?' — '+l.lieu:'');
 const jusRun=l=>(l.docs||[]).map(d=>`<div class="doc"><span class="grow" style="min-width:0;word-break:break-word">📎 ${esc(d.name)}</span><button type="button" class="btn sec sm" data-jo="${esc(d.id)}">Ouvrir</button></div>`).join('');
 const bindJo=root=>$$('[data-jo]',root).forEach(b=>b.onclick=()=>openJus(b.dataset.jo));
 function getRun(c){const r=obj(c.run),n=c.lignes.length;
-  c.run={t0:+r.t0||0,i:Math.max(0,Math.min(Math.round(+r.i||0),Math.max(0,n-1))),log:obj(r.log),ov:obj(r.ov),done:!!r.done,end:+r.end||0};return c.run}
+  c.run={fix:obj(r.fix),t0:+r.t0||0,i:Math.max(0,Math.min(Math.round(+r.i||0),Math.max(0,n-1))),log:obj(r.log),ov:obj(r.ov),done:!!r.done,end:+r.end||0};return c.run}
 const runEff=(r,l)=>{const o=obj(r.ov[l.id]);return o.skip?0:blank(o.duree)?num(l.duree):num(o.duree)};
 /* horaires prévus (référence) et horaires projetés (compte tenu de l'heure qu'il est et des adaptations du jour) */
 
@@ -2164,7 +2201,53 @@ const telify=(s,short)=>esc(s).replace(/\+?\d[\d .]{7,}\d|\d+/g,m=>m.replace(/\D
 const sheetHTML=(t,body)=>`<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(t)}"><div class="sheet"><h2>${esc(t)}</h2>${body}<div class="row" style="margin-top:14px"><button class="btn grow" id="mNo">Fermer</button></div></div></div>`;
 const bx2=(l,html,c='')=>html?`<div class="box ${c}"><b class="l">${l}</b><span style="white-space:pre-wrap">${html}</span></div>`:'';
 
-VIEWS.ctiRun={item:1,back:'cti',t:()=>esc(item.titre||'CTI')+sub2('Conduite de la prestation'),async r(){
+/* ================= GUIDAGE : un guidage par CTI, créé automatiquement ; c'est la conduite de la prestation =================
+   Tant qu'il n'est pas commencé, il suit le CTI (toute modification du CTI s'y retrouve). Une fois commencé, le CTI est verrouillé et le guidage évolue seul. */
+const guiState=c=>{const r=obj(c.run);return r.t0?(r.done?'fini':'cours'):'pret'};
+const guiLab={pret:'Prêt à conduire',cours:'En cours',fini:'Terminé'};
+VIEWS.guiList={top:1,t:()=>'Tiango '+sub2('Guidage des prestations'),async r(){
+  const L=(await live('items')).filter(i=>i.kind==='cti').map(fixItem).sort((a,b)=>({cours:0,pret:1,fini:2}[guiState(a)]-{cours:0,pret:1,fini:2}[guiState(b)])||b.updated-a.updated);
+  if(view!=='guiList')return;
+  $('#main').innerHTML=`<p class="mute" style="margin:14px 0 0">Chaque CTI a son guidage, créé automatiquement. Ouvrez-le le jour de la prestation pour la conduire étape par étape, ou imprimez-le en papier avec les discours.</p>`+
+   (L.length?L.map(c=>{const st=guiState(c),r=obj(c.run);return `<div class="card rep" data-id="${esc(c.id)}"><div class="th">🚩</div><div class="grow"><h3>${esc(c.titre||'CTI sans titre')}</h3><div class="mute">${esc([c.sous,frDate(c.date)].filter(Boolean).join(' · '))}</div>
+     <span class="pill${st==='cours'?' bad':''}">${st==='cours'?'▶ ':''}${guiLab[st]}${st==='cours'?' · étape '+(Math.min(+r.i||0,c.lignes.length-1)+1)+' / '+c.lignes.length:''}</span><span class="pill">${c.lignes.length} étape${c.lignes.length>1?'s':''}</span>
+     <div class="row" style="margin-top:8px"><button type="button" class="btn sec sm" data-gp="${esc(c.id)}">📄 Guidage papier (PDF / Word)</button></div></div></div>`}).join(''):`<div class="empty"><b>Aucun guidage</b>Créez d'abord un CTI : son guidage apparaît ici automatiquement.</div>`);
+  cards($('#main'),id=>{guiBack=null;go('ctiRun',id)});
+  $$('[data-gp]').forEach(b=>b.onclick=e=>{e.stopPropagation();guiPrint(b.dataset.gp)})}};
+async function guiPrint(id){
+  const c=fixItem(await DB.get('items',id));if(!c||c.deleted)return;
+  const vis=(await live('items')).filter(i=>i.kind==='vis').map(fixItem),used=[...new Set(c.lignes.map(l=>l.visId).filter(Boolean))].map(i=>vis.find(v=>v.id===i)).filter(Boolean),
+    langs=[...new Set(used.flatMap(v=>v.langs||[]))];
+  const go2=async lg=>{closeModal();const [pres,reps]=await Promise.all([live('items').then(a=>a.filter(i=>i.kind==='pre')),live('reps').then(a=>a.map(fixRep))]);
+    preview({title:'Guidage — '+(c.titre||'CTI'),name:'Guidage_'+slug(c.titre)+(c.date?'_'+c.date:''),blocks:guiModel(c,{pres,reps,vis,lang:lg}),back:'guiList'})};
+  if(!used.length)return go2('');
+  $('#modal').innerHTML=sheetHTML('Guidage papier',`<p class="mute">Le document reprend toutes les étapes dans l'ordre. Choisissez la langue des discours à y inclure.</p><div style="display:grid;gap:8px">${langs.map(l=>`<button type="button" class="btn" data-lg="${esc(l)}">Discours en ${esc(l.toUpperCase())}</button>`).join('')}<button type="button" class="btn sec" data-lg="">Sans les discours (déroulé seul)</button></div>`);
+  $('#mNo').onclick=closeModal;$$('[data-lg]').forEach(b=>b.onclick=()=>go2(b.dataset.lg))}
+/* document papier du guidage : le déroulé complet, étape par étape, avec les discours */
+function guiModel(c,x={}){
+  const k=ctiCalc(c),r=obj(c.run),fx=obj(r.fix),pres=x.pres||[],B=[{h1:'Guidage de la prestation'},{meta:[c.titre,c.sous,c.date&&frDate(c.date),c.lignes.length&&hm(t2m(c.debut))+' → '+hm(k.end)].filter(Boolean).join(' — ')}];
+  if(c.h.urgences)B.push({small:'Urgences : '+c.h.urgences});
+  if(c.accs.length)B.push({h2:'Accompagnateurs'},{grid:{w:[2600,5400,3600],head:['Fonction','Nom','Téléphone'],rows:c.accs.map(a=>[a.role||'',accNom(a,pres)||'à préciser',accTel(a,pres)])}});
+  const CT=c.contacts.map(ct=>{const I=contactInfo(ct,pres,x.reps||[]);return [ct.role||'',I.nom+(I.det?'\n'+I.det:''),I.tel,ct.note||'']}).filter(r=>r[1]||r[2]);
+  if(CT.length)B.push({h2:'Contacts'},{grid:{w:[1800,4200,2600,4400],head:['Rôle','Nom','Téléphone','Remarque'],rows:CT}});
+  const fl=(x.lang||'');
+  c.lignes.forEach((l0,i)=>{const l=Object.assign({},l0,fx[l0.id]),row=k.rows[i],ty=(LT[l.type]||LT.arret);
+    B.push({h2:`${row.hor}  ·  ${l.lieu||ty[0]}${num(l.duree)?'  ('+mins(num(l.duree))+')':''}`});
+    const info=[l.imp?'IMPÉRATIF'+(l.hfix?' à '+hm(t2m(l.hfix)):''):'',l.itin&&'Itinéraire : '+l.itin,row.km&&'Kilomètres : '+row.km,ctiEff(c,i)&&'Effectif attendu : '+ctiEff(c,i),[l.conf,l.bon&&'bon / réservation '+l.bon].filter(Boolean).join(' — ')&&'Réservation : '+[l.conf,l.bon&&'bon / réservation '+l.bon].filter(Boolean).join(' — '),
+      l.a_dep&&'Dépose : '+l.a_dep,l.a_park&&'Stationnement : '+l.a_park,l.a_ent&&'Entrée : '+l.a_ent,l.a_rdv&&'Rendez-vous : '+l.a_rdv,l.conv&&'Convenu : '+l.conv,l.rem&&'Remarques : '+l.rem,l.note&&'Correction de dernière minute : '+l.note,l.obs&&'Constat du repérage : '+l.obs,l.todo&&'À vérifier sur place : '+l.todo].filter(Boolean);
+    if(info.length)B.push({p:info.join('\n')});
+    if(l.contenu)B.push({p:'Thème du commentaire : '+l.contenu});
+    const v=(x.vis||[]).find(v=>v.id===l.visId);
+    if(fl&&v&&l.type!=='trajet'&&l.type!=='pec'&&l.type!=='fin'){
+      const fo=l.fId&&v.formules.find(f=>f.id===l.fId),mo=l.modCode&&modByCode(v,l.modCode),S=mo?[mo]:ctiSteps(v,fo);
+      S.forEach(m=>{const t=(m.texte||{})[fl];B.push({h3:[m.code,m.lieu||(m.titre&&m.titre[fl])].filter(Boolean).join(' — ')+(num(m.duree)?' ('+mins(num(m.duree))+')':'')});
+        if(m.cle)B.push({small:'Message clé : '+m.cle});if(m.place)B.push({small:'Où placer le groupe : '+m.place});
+        if(m.consigne)B.push({small:'Consigne (jamais prononcée) : '+m.consigne});
+        if(t)String(t).split(/\n{2,}/).forEach(p=>{p=p.trim();if(p)B.push({p:/^⟨/.test(p)?'['+p.replace(/^⟨|⟩$/g,'')+']':p})});
+        else B.push({small:m.type==='repas'||m.type==='pause'?'(sans discours)':'(discours non rédigé en '+fl.toUpperCase()+')'})})}});
+  B.push({small:'Document établi avec Tiango – tiango.fr'});return B}
+let guiBack=null;   /* d'où l'on vient : le CTI, ou la liste des guidages */
+VIEWS.ctiRun={item:1,get back(){return guiBack||'guiList'},t:()=>esc(item.titre||'CTI')+sub2('Guidage de la prestation'),async r(){
   const c=item,r=getRun(c),L=c.lignes,reps=(await live('reps')).map(fixRep),vis=(await live('items')).filter(i=>i.kind==='vis').map(fixItem);
   if(item!==c||view!=='ctiRun')return;clearInterval(runT);
   if(!L.length){$('#main').innerHTML='<div class="empty"><b>Ce CTI n\'a pas encore de déroulé</b>Ajoutez des trajets et des arrêts avant de le conduire.</div>';return}
@@ -2173,20 +2256,21 @@ VIEWS.ctiRun={item:1,back:'cti',t:()=>esc(item.titre||'CTI')+sub2('Conduite de l
     $('#main').innerHTML=`<div class="card"><h2 style="font-size:20px">${esc(c.titre||'Prestation')}</h2><p class="mute">${esc([c.sous,frDate(c.date)].filter(Boolean).join(' · '))}</p>
       <div class="kpis"><div class="kpi"><b>${hm(k.plan[0])}</b><span>départ prévu</span></div><div class="kpi"><b>${hm(k.target)}</b><span>fin prévue</span></div><div class="kpi"><b>${L.length}</b><span>étapes</span></div></div>
       <div class="box ${ctiCheck(c).length?'warn':''}"><b class="l">Vérification avant le départ</b>${chkHTML(ctiCheck(c))}</div>${bx2('Prise en charge',esc(c.h.pec||''))}${bx2('Météo et solution de repli',esc(c.h.meteo||''))}
-      <div class="row" style="margin-top:14px"><button class="btn acc grow" id="rGo">▶ Démarrer la prestation maintenant</button></div>
+      <div class="row" style="margin-top:14px"><button class="btn acc grow" id="rGo">▶ Démarrer la prestation maintenant</button></div><div class="row" style="margin-top:10px"><button class="btn sec grow" id="rPr">📄 Guidage papier (PDF / Word)</button><button class="btn sec grow" id="rCti">🗺️ Ouvrir le CTI</button></div>
       <p class="mute" style="margin-top:10px">Tiango prend l'heure de cet appareil comme heure de départ, puis recale la suite au fil de la journée. Le CTI de référence n'est pas modifié : au retour, vous choisirez ce que vous y reportez.</p></div>`;
+    $('#rPr').onclick=()=>guiPrint(c.id);$('#rCti').onclick=()=>go('cti',c.id);
     $('#rGo').onclick=()=>{r.t0=Date.now();r.i=0;r.log={[L[0].id]:{t0:r.t0}};r.ov={};r.done=false;saveItem(true);VIEWS.ctiRun.r()};return}
   /* ----- prestation terminée ----- */
   if(r.done){const rows=L.map(l=>({l,g:obj(r.log[l.id]),o:obj(r.ov[l.id])})).map(x=>({...x,reel:x.g.t0&&x.g.t1?Math.max(0,Math.round((x.g.t1-x.g.t0)/6e4)):null}));
     $('#main').innerHTML=`<div class="card"><h2 style="font-size:20px">Prestation terminée</h2><p class="mute">Départ ${hm(tsMin(r.t0))} · fin ${hm(tsMin(r.end))} · le ${new Date(r.t0).toLocaleDateString('fr-FR')}</p>
       <table class="tb"><tr><th>Étape</th><th>Prévu</th><th>Réel</th><th>Compté</th></tr>${rows.map(x=>`<tr><td>${esc(lab(x.l))}${x.g.note?`<br><span class="mute">${esc(x.g.note)}</span>`:''}</td><td>${num(x.l.duree)} min</td><td>${x.o.skip?'annulé':x.reel===null?'—':x.reel+' min'}</td><td>${(x.g.cnt||[]).length?x.g.cnt[x.g.cnt.length-1].n+(x.l.eff?' / '+x.l.eff:''):'—'}</td></tr>`).join('')}</table>
-      <div class="row" style="margin-top:14px"><button class="btn grow" id="rRep">↩ Choisir ce que je reporte dans le CTI</button></div>
+      <div class="row" style="margin-top:14px"><button class="btn sec grow" id="rPr2">📄 Guidage papier (PDF / Word)</button></div><div class="row" style="margin-top:10px"><button class="btn grow" id="rRep">↩ Choisir ce que je reporte dans le CTI</button></div>
       <div class="row" style="margin-top:10px"><button class="btn sec grow" id="rNew">Préparer une nouvelle conduite</button></div></div>`;
-    $('#rRep').onclick=()=>runReport(c,rows);
+    $('#rRep').onclick=()=>runReport(c,rows);$('#rPr2').onclick=()=>guiPrint(c.id);
     $('#rNew').onclick=()=>confirmBox('Préparer une nouvelle conduite ?','Cette conduite reste dans l\'historique du CTI (heures, constats, comptages). Seule la conduite en cours est remise à zéro. Reportez dans le CTI ce que vous voulez garder.','Continuer',()=>{archRun(c);c.run=null;saveItem(true);VIEWS.ctiRun.r()});return}
   /* ----- en cours : une étape à la fois ----- */
   const isSkip=x=>!!obj(r.ov[x.id]).skip,nextLive=()=>{for(let j=r.i+1;j<L.length;j++)if(!isSkip(L[j]))return j;return -1};
-  const l=L[r.i],g=r.log[l.id]=obj(r.log[l.id]),rep=reps.find(x=>x.id===l.repId),v=vis.find(x=>x.id===l.visId),last=nextLive()<0;   /* dernière étape utile : toutes les suivantes sont annulées */
+  const dl=x=>r.fix[x.id]?Object.assign({},x,r.fix[x.id]):x,l=dl(L[r.i]),g=r.log[l.id]=obj(r.log[l.id]),rep=reps.find(x=>x.id===l.repId),v=vis.find(x=>x.id===l.visId),last=nextLive()<0;   /* dernière étape utile : toutes les suivantes sont annulées */
   try{if(navigator.wakeLock&&!runWL)navigator.wakeLock.request('screen').then(w=>{runWL=w}).catch(()=>{})}catch(e){}   /* l'écran reste allumé pendant la conduite */
   leave=()=>{clearInterval(runT);try{runWL&&runWL.release()}catch(e){}runWL=null};
   $('#main').innerHTML=`<div style="padding-bottom:76px">
@@ -2197,9 +2281,9 @@ VIEWS.ctiRun={item:1,back:'cti',t:()=>esc(item.titre||'CTI')+sub2('Conduite de l
       ${(l.a_dep||l.a_park||l.a_ent||l.a_rdv)?`<div class="box"><b class="l">Plan d'accès</b>${[['Dépose',l.a_dep],['Stationnement',l.a_park],['Entrée',l.a_ent],['Rendez-vous',l.a_rdv]].filter(x=>x[1]).map(x=>`<div><b>${x[0]}</b> : ${esc(x[1])}</div>`).join('')}</div>`:''}
       ${(l.bon||l.conf||l.eff||l.conv||l.lim||(l.docs||[]).length)?`<div class="box"><b class="l">Dossier de l'étape</b>${[['Confirmation',l.conf],['Bon / réservation',l.bon],['Effectif attendu',ctiEff(c,r.i)],['Date limite',l.lim&&frDate(l.lim)],['Convenu',l.conv]].filter(x=>x[1]).map(x=>`<div><b>${x[0]}</b> : ${esc(x[1])}</div>`).join('')}${jusRun(l)}</div>`:''}
       <div id="rRdv"></div>
-      ${bx2('Itinéraire',esc(l.itin||''))}${bx2('Commentaire',esc(l.contenu||''))}${bx2('Remarques',esc(l.rem||''),'warn')}${bx2('Constat du repérage',esc(l.obs||''))}${bx2('Non vérifié au repérage',esc(l.todo||''),'warn')}
+      ${bx2('Itinéraire',esc(l.itin||''))}${bx2('Commentaire',esc(l.contenu||''))}${bx2('Correction de dernière minute',esc(l.note||''),'warn')}${bx2('Remarques',esc(l.rem||''),'warn')}${bx2('Constat du repérage',esc(l.obs||''))}${bx2('Non vérifié au repérage',esc(l.todo||''),'warn')}
       <div class="row" style="margin-top:12px">${v?'<button class="btn sec sm grow" id="rVis">🎙 Visite</button>':''}${rep?'<button class="btn sec sm grow" id="rFic">📍 Fiche</button>':''}<button class="btn sec sm grow" id="rTel">☎ Contacts</button><button class="btn sec sm grow" id="rPb">☔ Plan B</button></div>
-      <div class="row" style="margin-top:8px"><button class="btn sec sm grow" id="rDoc">📁 Dossier du jour</button><button class="btn sec sm grow" id="rCnt">👥 Compter</button><button class="btn sec sm grow" id="rMsg">💬 Consignes</button></div>
+      <div class="row" style="margin-top:8px"><button class="btn sec sm grow" id="rDoc">📁 Dossier du jour</button><button class="btn sec sm grow" id="rCnt">👥 Compter</button><button class="btn sec sm grow" id="rMsg">💬 Consignes</button><button class="btn sec sm grow" id="rFx">✏️ Corriger</button></div>
       <div class="f"><label for="rNote">Constat du jour pour cette étape</label><textarea id="rNote" placeholder="Dépose déplacée, WC fermés, groupe en retard…">${esc(g.note||'')}</textarea></div></div>
     <div class="card"><b>Ensuite</b><div id="rNext"></div><div class="box" id="rEnd"></div></div></div>
    <nav class="pnav"><div class="wrap"><button class="btn sec" id="rP" aria-label="Étape précédente"${r.i?'':' disabled'}>‹</button><button class="btn sec" id="rAd">Adapter la suite</button><button class="btn acc" id="rN">${last?'Terminer':'Étape suivante ›'}</button></div></nav>`;
@@ -2223,6 +2307,14 @@ VIEWS.ctiRun={item:1,back:'cti',t:()=>esc(item.titre||'CTI')+sub2('Conduite de l
     saveItem(true);window.scrollTo(0,0);VIEWS.ctiRun.r()};
   $('#rN').onclick=()=>last?confirmBox('Terminer la prestation ?',(r.i<L.length-1?'Les étapes restantes sont annulées : elles figureront comme telles au bilan.\n':'')+'L\'heure de fin sera enregistrée. Vous pourrez ensuite choisir ce que vous reportez dans le CTI.','Terminer',()=>move(1)):move(1);
   $('#rP').onclick=()=>move(-1);
+  /* corrections de dernière minute : notées dans le guidage, le CTI de référence n'est pas touché */
+  $('#rFx').onclick=()=>{const o=obj(r.fix[l.id]);$('#modal').innerHTML=sheetHTML('Corriger cette étape',`<p class="mute">Ces corrections valent pour ce guidage seulement : le CTI n'est pas modifié.</p>
+    <div class="f"><label for="fxC">Confirmation</label><select id="fxC"><option value=""></option>${['À confirmer','Confirmé','Annulé'].map(x=>`<option${x===l.conf?' selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="f"><label for="fxB">Bon d'échange / n° de réservation</label><input id="fxB" type="text" value="${esc(l.bon||'')}"></div>
+    <div class="f"><label for="fxR">Remarques</label><textarea id="fxR">${esc(l.rem||'')}</textarea></div>
+    <div class="f"><label for="fxN">Note de dernière minute (téléphone, changement d'adresse…)</label><textarea id="fxN">${esc(l.note||'')}</textarea></div>
+    <div class="row" style="margin-top:10px"><button class="btn acc grow" id="fxOk">Enregistrer</button></div>`);
+    $('#mNo').onclick=closeModal;$('#fxOk').onclick=()=>{r.fix[l.id]={conf:$('#fxC').value,bon:$('#fxB').value.trim(),rem:$('#fxR').value,note:$('#fxN').value.trim()};saveItem(true);VIEWS.ctiRun.r()}};
   $('#rAd').onclick=()=>runAdapt(c);
   const hnow=()=>{const k=runCalc(c);return hm(k.proj[r.i]+runEff(r,l))};
   $('#rMsg').onclick=()=>{const h=hnow();$('#modal').innerHTML=sheetHTML('Consignes courtes',`<p class="mute">Heure insérée : ${h} (fin de l'étape). Montrez l'écran ou lisez à voix haute.</p>`+RUN_MSG.map(m=>`<details class="sec"><summary>${esc(m[0].replace('{h}',h))}</summary><div class="body">${m.map((t,i)=>`<p style="font-size:19px;margin:6px 0"><span class="mute" style="font-size:12px">${RUN_LG[i]}</span><br>${esc(t.replace('{h}',h))}</p>`).join('')}</div></details>`).join(''));$('#mNo').onclick=closeModal};
@@ -2234,7 +2326,7 @@ VIEWS.ctiRun={item:1,back:'cti',t:()=>esc(item.titre||'CTI')+sub2('Conduite de l
       $('#mNo').onclick=closeModal;$('#cOk').onclick=()=>{const n=$('#cN').value;if(n==='')return toast('Saisissez le nombre de personnes');C.push({t:Date.now(),n:num(n)});saveItem(true);draw()}};draw()};
   $('#rDoc').onclick=async()=>{const pres=(await live('items')).filter(x=>x.kind==='pre'),allReps=(await live('reps')).map(fixRep);
     const ct=(c.contacts||[]).map(x=>({x,I:contactInfo(x,pres,allReps)})).filter(o=>o.I.nom||o.I.tel).map(({x,I})=>[(x.role?x.role+' : ':'')+I.nom,I.tel,I.mail].filter(Boolean).join('\n')).join('\n\n');
-    const docs=L.filter(x=>x.bon||x.conf||x.eff||x.conv||x.lim||x.imp||(x.docs||[]).length).map(x=>bx2(esc(lab(x)+(x.imp&&x.hfix?' — '+hm(t2m(x.hfix))+' impératif':'')),telify([x.conf&&'Confirmation : '+x.conf,x.bon&&'Bon / réservation : '+x.bon,x.eff&&'Effectif attendu : '+x.eff,x.lim&&'Date limite : '+frDate(x.lim),x.conv&&'Convenu : '+x.conv].filter(Boolean).join('\n'))+jusRun(x))).join('');
+    const docs=L.map(dl).filter(x=>x.bon||x.conf||x.eff||x.conv||x.lim||x.imp||(x.docs||[]).length).map(x=>bx2(esc(lab(x)+(x.imp&&x.hfix?' — '+hm(t2m(x.hfix))+' impératif':'')),telify([x.conf&&'Confirmation : '+x.conf,x.bon&&'Bon / réservation : '+x.bon,x.eff&&'Effectif attendu : '+x.eff,x.lim&&'Date limite : '+frDate(x.lim),x.conv&&'Convenu : '+x.conv].filter(Boolean).join('\n'))+jusRun(x))).join('');
     $('#modal').innerHTML=sheetHTML('Dossier du jour',bx2('Contacts',telify(ct))+bx2('Urgences',telify(c.h.urgences||'',true),'warn')+(docs||'<p class="mute">Aucun bon ni confirmation saisi dans ce CTI.</p>'));$('#mNo').onclick=closeModal;bindJo($('#modal'))};
   $('#rTel').onclick=async()=>{const d=rep?rep.d:{};
     const pres=(await live('items')).filter(x=>x.kind==='pre'),allReps=(await live('reps')).map(fixRep),ct=(c.contacts||[]).map(x=>{const I=contactInfo(x,pres,allReps);return {x,I}}).filter(o=>o.I.nom||o.I.tel);
@@ -2428,7 +2520,8 @@ $('#bMenu').onclick=async()=>{
    <button class="btn sec" id="m2">💾 Sauvegarder toutes mes données</button>
    <button class="btn sec" id="m3">📥 Importer (sauvegarde, site à visiter ou CTI)</button>
    <button class="btn sec" id="m7">🔑 Licence${LIC.state==='valide'?' : '+esc(LIC.nom):' (démonstration)'}</button>
-   <button class="btn sec" id="m8">🎙️ Discours de visite (tous)</button>
+   <button class="btn sec" id="m9">💶 Budgets et prix de vente</button>
+   <button class="btn sec" id="m10">📇 Annuaire des prestataires</button>
    <button class="btn sec" id="m4"${n>1?'':' disabled'}>🧭 Synthèse des sites</button>
    <button class="btn sec" id="m5">🗑 Corbeille${nt?' ('+nt+')':''}</button></div>
    <div class="box${!lbt&&n||old?' warn':''}" style="margin-top:14px">${lbt?`Dernière sauvegarde : ${new Date(lbt).toLocaleDateString('fr-FR')}${typeof lb==='object'?` (${lb.reps} sites, ${lb.items} circuits, CTI, repérages, visites, budgets et prestataires, ${lb.files} photos et documents, ${human(lb.size)})`:''}.${old?' Elle a plus d\'une semaine.':''}`:n?'Aucune sauvegarde effectuée : vos données n\'existent que sur cet appareil.':'Aucune donnée à sauvegarder pour l\'instant.'}</div>
@@ -2441,7 +2534,7 @@ $('#bMenu').onclick=async()=>{
   $('#mNo').onclick=closeModal;$('#m1').onclick=editProfil;
   $('#m2').onclick=doBackup;
   $('#m3').onclick=()=>importSheet();
-  $('#m4').onclick=()=>{closeModal();go('syn')};$('#m7').onclick=()=>licSheet();$('#m8').onclick=()=>{closeModal();go('visList')};
+  $('#m4').onclick=()=>{closeModal();go('syn')};$('#m7').onclick=()=>licSheet();$('#m9').onclick=()=>{closeModal();go('budList')};$('#m10').onclick=()=>{closeModal();go('preList')};
   $('#m5').onclick=()=>trashSheet();
 };
 
@@ -2449,7 +2542,7 @@ $('#bMenu').onclick=async()=>{
 (async()=>{
   try{profil=obj(await DB.get('kv','profil'))}catch(e){$('#main').innerHTML='<div class="empty"><b>Stockage indisponible</b>Ce navigateur bloque l\'enregistrement local (navigation privée ?). Ouvrez l\'application dans une fenêtre normale.</div>';return}
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
-  if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+  if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){const reg=()=>navigator.serviceWorker.register('sw.js').catch(()=>{});if(navigator.onLine===false)addEventListener('online',reg,{once:true});else reg()}   /* hors connexion : pas de vérification de mise à jour, donc pas d'alerte iOS */
   /* ne rien laisser en attente : à la perte de focus d'un champ, au passage en arrière-plan, à la fermeture */
   addEventListener('pagehide',()=>{flushAll()});document.addEventListener('visibilitychange',()=>{if(document.hidden)flushAll()});document.addEventListener('focusout',()=>{if(!$('#modal [role="alertdialog"]'))flushAll()});
   addEventListener('beforeunload',e=>{if(dirty||idirty||pend){flushAll();e.preventDefault();e.returnValue=''}});
@@ -2458,5 +2551,5 @@ $('#bMenu').onclick=async()=>{
     if(m.data==='here')toast('Tiango est déjà ouvert dans un autre onglet. Fermez-en un pour éviter d\'écraser vos saisies.',9000)};bc.postMessage('hello')}catch(e){}
   /* vidage automatique de la corbeille après 30 jours */
   try{const lim=Date.now()-TRASH_DAYS*864e5;for(const r of await DB.all('reps'))if(r.deleted&&r.deleted<lim)await purge(r);for(const i of await DB.all('items'))if(i.deleted&&i.deleted<lim)await purgeItem(i)}catch(e){}
-  await licInit();await profilSync();mark('ok');bkRefresh();go('list');
+  await licInit();await syncDur();await profilSync();mark('ok');bkRefresh();go('list');
 })();

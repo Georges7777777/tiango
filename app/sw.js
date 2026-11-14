@@ -1,6 +1,6 @@
 /* Tiango – fonctionnement hors ligne : garde une copie de l'application dans l'appareil.
    À déposer à côté de index.html. CHANGEZ LE NUMÉRO DE VERSION à chaque mise à jour d'un fichier. */
-const V = 'tiango-v22';
+const V = 'tiango-v23';
 const FILES = ['./', 'app.js', 'manifest.webmanifest', 'icon-32.png', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'logo.png', 'logo-dark.png'];
 const good = r => r && r.ok && r.status === 200 && r.type === 'basic';   /* jamais de page d'erreur dans le cache */
 
@@ -15,6 +15,11 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const q = e.request;
   if (q.method !== 'GET' || new URL(q.url).origin !== location.origin) return;
+  /* hors connexion (mode avion) : copie locale directement, sans tenter le réseau, pour que l'iPhone n'affiche pas son alerte « Désactivez le mode Avion… » */
+  if (self.navigator && self.navigator.onLine === false) {
+    e.respondWith(caches.match(q, { ignoreSearch: true }).then(m => m || (q.mode === 'navigate' ? caches.match('./') : null)).then(m => m || fetch(q)));
+    return;
+  }
   /* réseau d'abord, pour recevoir les mises à jour ; copie locale si le réseau manque ou répond par une erreur */
   e.respondWith(
     fetch(q).then(r => {
