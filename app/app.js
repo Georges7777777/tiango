@@ -656,16 +656,17 @@ VIEWS.preview={get back(){return pv.back},t:()=>esc(pv.title)+sub2('Aperçu avan
 /* ================= ESPACE CTI : cadre technique d'itinéraire ================= */
 const LT={pec:['Prise en charge','Prise en charge'],trajet:['Trajet','Déplacement + commentaire à bord'],arret:['Arrêt','Arrêt commenté'],pause:['Pause','Pause'],repas:['Repas','Repas'],libre:['Temps libre','Temps libre'],fin:['Fin de prestation','Fin de prestation / passage de témoin']};
 /* Détail d'un arrêt : un site visité avec plusieurs modules (stations, pause, repas) devient une ligne par module dans le CTI */
-const ctiSteps=(v,fo)=>v?(fo?fSeq(v,fo):v.modules.filter(m=>m.type!=='extension'&&m.type!=='pause'&&m.type!=='repas')):[];
-function ctiSubs(l,v){
+const ctiSteps=(v,fo)=>v?stepU(fo?fSeq(v,fo):v.modules.filter(m=>m.type!=='extension'&&m.type!=='pause'&&m.type!=='repas')):[];
+function ctiSubs(l,v,rp){
   const fo=l.fId&&v?v.formules.find(f=>f.id===l.fId):null,S=ctiSteps(v,fo),g=l.grp||l.id;
   return S.map((m,k)=>{
     const ty=m.type==='repas'?'repas':m.type==='pause'?'pause':'arret',nom=(m.lieu||m.code||'').trim();
     const s={id:uid(),type:ty,nature:LT[ty][1],lieu:ty==='arret'?[l.lieu,nom].filter(Boolean).join(' — '):(nom||LT[ty][0]),duree:String(num(m.duree)||''),repId:l.repId||'',visId:v.id,fId:fo?fo.id:'',modCode:(m.code||'').trim(),grp:g};
-    if(k===0){Object.keys(l).forEach(x=>{if(!(x in s)&&x!=='orig')s[x]=l[x]});s.orig=JSON.parse(JSON.stringify(Object.assign({},l,{orig:undefined})))}
+    if(ty==='arret'&&rp){const pt=(m.ptId&&(rp.points||[]).find(x=>x.id===m.ptId))||(rp.points||[]).find(x=>modCovers(m,x));if(pt&&String(pt.note||'').trim())s.contenu=String(pt.note).trim()}
+    if(k===0){Object.keys(l).forEach(x=>{if(!(x in s)&&x!=='orig')s[x]=l[x]});if(String(l.contenu||'').trim())s.contenu=l.contenu;s.orig=JSON.parse(JSON.stringify(Object.assign({},l,{orig:undefined})))}
     return s})}
 const ctiCanDetail=(l,v)=>!!v&&l.type==='arret'&&!l.modCode&&ctiSubs(l,v).filter(s=>num(s.duree)>0).length>=2;
-function ctiDetail(c,i,v){const l=c.lignes[i];if(!ctiCanDetail(l,v))return false;c.lignes.splice(i,1,...ctiSubs(l,v));return true}
+function ctiDetail(c,i,v,rp){const l=c.lignes[i];if(!ctiCanDetail(l,v))return false;c.lignes.splice(i,1,...ctiSubs(l,v,rp));return true}
 function ctiRegroup(c,g){
   const ix=c.lignes.map((l,i)=>l.grp===g?i:-1).filter(i=>i>=0);if(!ix.length)return false;
   const f=c.lignes[ix[0]],o=f.orig;
@@ -770,7 +771,7 @@ VIEWS.cti={item:1,back:'ctiList',t:()=>esc(item.titre||'Nouveau CTI')+sub2('Cadr
     if(e.target.dataset.k==='type'){const old=Object.values(LT).map(x=>x[1]);if(!l.nature||old.includes(l.nature)){l.nature=(LT[l.type]||LT.arret)[1];const n=$('[data-k="nature"]',el);if(n)n.value=l.nature}saveItem(true)}
     if(e.target.dataset.lk){l[e.target.dataset.lk]=e.target.value;if(e.target.dataset.lk==='visId')l.fId='';if(e.target.dataset.lk==='fId'&&l.fId){const v=vis.find(x=>x.id===l.visId),f=v&&v.formules.find(x=>x.id===l.fId);if(f&&blank(l.prevu)){l.duree=String(fTot(v,f).d)}}saveItem(true);VIEWS.cti.r()}});
   $('#cL').addEventListener('click',e=>{const bt=e.target.closest('[data-det],[data-reg]');if(!bt)return;
-    if(bt.dataset.det){const i=c.lignes.findIndex(x=>x.id===bt.dataset.det),l=c.lignes[i];if(l&&ctiDetail(c,i,vis.find(x=>x.id===l.visId))){saveItem(true);VIEWS.cti.r();toast('Étapes détaillées : indiquez l\'heure impérative du repas sur sa ligne')}}
+    if(bt.dataset.det){const i=c.lignes.findIndex(x=>x.id===bt.dataset.det),l=c.lignes[i];if(l&&ctiDetail(c,i,vis.find(x=>x.id===l.visId),reps.find(x=>x.id===l.repId))){saveItem(true);VIEWS.cti.r();toast('Étapes détaillées : indiquez l\'heure impérative du repas sur sa ligne')}}
     else if(ctiRegroup(c,bt.dataset.reg)){saveItem(true);VIEWS.cti.r();toast('Étapes regroupées')}});
   $('#cL').addEventListener('click',e=>{if(!e.target.matches('[data-fill]'))return;const el=e.target.closest('.pt'),l=c.lignes[+el.dataset.i],r=reps.find(x=>x.id===l.repId);if(!r)return;
     const P=pratiques(r.d);
@@ -866,7 +867,7 @@ function ctiModel(c,x={}){
 let vLang='fr', play=null, playT=null, visBack=null;
 /* un point du site est couvert par un module qui porte son nom (tous types : station, pause, extension) ou qui lui a été relié */
 const nmz=t=>strip(t).replace(/[^a-z0-9]+/g,' ').trim();
-function sameName(a,b){a=nmz(a);b=nmz(b);if(!a||!b)return false;if(a===b)return true;const [c,l]=a.length<b.length?[a,b]:[b,a];return l.includes(c)&&c.split(' ').length>=3&&c.length/l.length>=.6}
+function sameName(a,b){a=nmz(a);b=nmz(b);if(!a||!b)return false;if(a===b)return true;const [c,l]=a.length<b.length?[a,b]:[b,a];if(c.split(' ').length<3)return false;if((l+' ').startsWith(c+' '))return true;return l.includes(c)&&c.length/l.length>=.6}
 const modCovers=(m,p)=>(m.ptId&&m.ptId===p.id)||sameName(m.lieu,p.nom)||sameName(m.titre&&m.titre.fr,p.nom);
 const visMiss=(v,rep)=>rep?(rep.points||[]).filter(p=>nmz(p.nom)&&!(v.modules||[]).some(m=>modCovers(m,p))):[];
 const nextMCode=v=>'M'+(Math.max(-1,...v.modules.map(m=>{const x=/^M(\d+)$/i.exec(String(m.code||'').trim());return x?+x[1]:-1}))+1);
@@ -876,14 +877,16 @@ const modByCode=(v,code)=>v.modules.find(m=>(m.code||'').trim().toLowerCase()===
 const dupCodes=v=>{const c={};v.modules.forEach(m=>{const k=(m.code||'').trim().toLowerCase();if(k)c[k]=(c[k]||0)+1});return Object.keys(c).filter(k=>c[k]>1)};
 const fCodes=f=>String(f.codes||'').split(/[,;→>·\n]+/).map(s=>s.trim()).filter(Boolean);
 const fSeq=(v,f)=>fCodes(f).map(c=>modByCode(v,c)).filter(Boolean);
-const vTot=v=>v.modules.filter(m=>m.type!=='extension'&&m.type!=='pause'&&m.type!=='repas').reduce((a,m)=>a+num(m.duree),0);
+/* V27.3 : plusieurs modules peuvent couvrir la même étape du site ; la durée de l'étape ne compte qu'une fois */
+const stepU=S=>{const z=new Set();return S.filter(m=>!m.ptId||(!z.has(m.ptId)&&z.add(m.ptId)))};
+const stepMods=(v,mo,fo)=>{if(!mo)return [];if(!mo.ptId)return [mo];const S=fo?fSeq(v,fo):v.modules.filter(m=>m.type!=='extension'&&m.type!=='pause'&&m.type!=='repas'),r=S.filter(m=>m.ptId===mo.ptId);return r.length?r:[mo]};
+const vTot=v=>stepU(v.modules.filter(m=>m.type!=='extension'&&m.type!=='pause'&&m.type!=='repas')).reduce((a,m)=>a+num(m.duree),0);
 /* ===== V27 : les formules d'assemblage appartiennent au SITE (rep.formules : suite d'étapes du site). Le discours en reçoit une projection (v.formules, codes de modules) pour que tout le reste fonctionne sans changement. ===== */
 const isPR=m=>m.type==='pause'||m.type==='repas';
 const covPt=(m,p)=>m.ptId?m.ptId===p.id:modCovers(m,p);
-function projCodes(v,rep,f){const out=[];
-  f.steps.forEach(pid=>{const p=rep.points.find(x=>x.id===pid);if(!p)return;
-    const ms=v.modules.filter(m=>!isPR(m)&&String(m.code||'').trim()&&covPt(m,p)),st=ms.filter(m=>m.type!=='extension');
-    (st.length?st:ms).forEach(m=>{const c=m.code.trim();if(!out.includes(c))out.push(c)})});
+const stepCand=(v,rep,pid)=>{const p=rep.points.find(x=>x.id===pid);if(!p)return {p:null,ms:[]};const ms=v.modules.filter(m=>!isPR(m)&&String(m.code||'').trim()&&covPt(m,p)),st=ms.filter(m=>m.type!=='extension');return {p,ms:st.length?st:ms}};
+function projCodes(v,rep,f){const out=[],ex=(v.fx&&v.fx[f.id])||[];
+  f.steps.forEach(pid=>{stepCand(v,rep,pid).ms.forEach(m=>{const c=m.code.trim();if(!ex.includes(c)&&!out.includes(c))out.push(c)})});
   return out.join(', ')}
 const projForm=(v,rep)=>rep.formules.map(f=>({id:f.id,nom:f.nom||'',pour:f.pour||'',codes:projCodes(v,rep,f)})).filter(f=>f.codes);
 const fKey=a=>JSON.stringify(a.map(f=>[f.id,f.nom,f.pour,f.codes]));
@@ -928,12 +931,12 @@ function mig27Sheet(){if(!mig27||!mig27.length)return;const R=mig27;mig27=null;
 async function syncDur(){
   try{await migrate27();const reps=(await live('reps')).map(fixRep),L=new Map(reps.map(r=>[r.id,r])),its=(await live('items')).filter(i=>i.kind==='vis').map(fixItem);let n=0;
     for(const v of its){const r=L.get(v.lieuId);if(!r)continue;let ch=false;
-      v.modules.forEach(m=>{const p=(r.points||[]).find(p=>modCovers(m,p));if(!p||blank(p.duree)||!num(p.duree))return;
+      v.modules.forEach(m=>{const p=(r.points||[]).find(p=>modCovers(m,p));if(p&&!m.ptId&&!isPR(m)){m.ptId=p.id;ch=true}if(!p||blank(p.duree)||!num(p.duree))return;
         const pd=String(num(p.duree));if(m.ptD===pd)return;m.ptD=pd;if(String(num(m.duree))!==pd||blank(m.duree))m.duree=pd;if(!m.ptId)m.ptId=p.id;ch=true});
       if(v.f27){const pf=projForm(v,r);if(fKey(pf)!==fKey(v.formules)){v.formules=pf;ch=true}}
       if(ch){v.updated=Date.now();await DB.put('items',v);n++}}
     return n}catch(e){return 0}}
-const fTot=(v,f)=>{const s=fSeq(v,f);return {n:s.length,d:s.reduce((a,m)=>a+num(m.duree),0),p:s.reduce((a,m)=>a+num(m.parole),0)}};
+const fTot=(v,f)=>{const s=fSeq(v,f),u=stepU(s);return {n:u.length,d:u.reduce((a,m)=>a+num(m.duree),0),p:s.reduce((a,m)=>a+num(m.parole),0)}};
 
 VIEWS.visList={top:1,t:()=>'Tiango '+sub2('Discours de visite'),r:()=>{visBack=null;return renderItems('vis')}};
 VIEWS.vis={item:1,get back(){return visBack&&item&&visBack[1]===item.lieuId?visBack:'visList'},t:()=>esc(item.nom||'Nouveau discours')+sub2('Discours de visite'),async r(){
@@ -985,8 +988,11 @@ VIEWS.vis={item:1,get back(){return visBack&&item&&visBack[1]===item.lieuId?visB
   drawVFor=()=>{const box=$('#vFor');if(!box)return;const rp=lx.find(r=>r.id===v.lieuId);
     if(rp&&v.f27){const pf=projForm(v,rp);if(fKey(pf)!==fKey(v.formules)){v.formules=pf;saveItem()}}
     box.innerHTML=`<p class="mute" style="margin:12px 0 0">Les formules sont réglées sur la fiche du site : elles valent pour tous les discours de ce site. Ici, Tiango les traduit en modules.</p>`
-      +(v.formules.length?v.formules.map(f=>{const t=fTot(v,f);return `<div class="pt"><div class="hd"><b class="grow">${esc(f.nom||'Formule')}</b><span class="hr">${mins(t.d)}</span></div><div class="mute" style="margin-top:4px">${esc(fCodes(f).join(' → '))}${f.pour?'<br>'+esc(f.pour):''}</div></div>`}).join(''):'<p class="mute">Aucune formule pour ce site.</p>')
+      +(v.formules.length?v.formules.map(f=>{const t=fTot(v,f),sf=rp&&rp.formules.find(x=>x.id===f.id),ex=(v.fx&&v.fx[f.id])||[],ch=sf?sf.steps.map(pid=>stepCand(v,rp,pid)).filter(x=>x.p&&x.ms.length>1):[];return `<div class="pt"><div class="hd"><b class="grow">${esc(f.nom||'Formule')}</b><span class="hr">${mins(t.d)}</span></div><div class="mute" style="margin-top:4px">${esc(fCodes(f).join(' → '))}${f.pour?'<br>'+esc(f.pour):''}</div>${ch.length?`<div style="margin-top:8px"><div class="mute">Cette formule reprend, pour chaque étape, tous ses modules. Décochez ceux que vous ne voulez pas :</div>${ch.map(x=>`<div style="margin-top:6px"><b>${esc(x.p.nom)}</b><div class="row" style="gap:14px;flex-wrap:wrap;margin-top:2px">${x.ms.map(m=>{const c=m.code.trim();return `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-fx="${esc(f.id)}|${esc(c)}"${ex.includes(c)?'':' checked'}> ${esc(c)}${m.titre&&m.titre.fr?' · '+esc(m.titre.fr):''}</label>`}).join('')}</div></div>`).join('')}</div>`:''}</div>`}).join(''):'<p class="mute">Aucune formule pour ce site.</p>')
       +(rp?'<div class="row" style="margin-top:12px"><button type="button" class="btn sec grow" id="vForGo">🧩 Régler les formules sur la fiche du site</button></div>':'');
+    $$('#vFor [data-fx]').forEach(cb=>cb.onchange=()=>{const [fid,code]=cb.dataset.fx.split('|'),sf=rp&&rp.formules.find(x=>x.id===fid);if(!sf)return;const fx=v.fx=v.fx&&typeof v.fx==='object'?v.fx:{},ex=fx[fid]=(fx[fid]||[]).filter(c=>c!==code);if(!cb.checked)ex.push(code);
+      if(sf.steps.some(pid=>{const ms=stepCand(v,rp,pid).ms;return ms.length&&ms.every(m=>ex.includes(m.code.trim()))})){ex.splice(ex.indexOf(code),1);cb.checked=true;return toast('Gardez au moins un module par étape')}
+      if(!ex.length)delete fx[fid];v.formules=projForm(v,rp);saveItem();drawVFor()});
     setCnt('v_for',String(v.formules.length));const g=$('#vForGo');if(g)g.onclick=async()=>{await saveItem(true);openLieu(v.lieuId,['vis',v.id],'for')}};
   drawVFor();
   const stOpts=v.modules.filter(m=>m.code).map(m=>[m.code,m.code+(m.lieu?' — '+m.lieu:'')]);
@@ -1516,7 +1522,7 @@ function ctiFromDay(c,ji,L,pres,vis,o){
       const arr={id:uid(),type:'arret',nature:LT.arret[1],lieu:lieuNom(r),duree:String(num(e.duree)||(fo?fTot(v,fo).d:v?vTot(v):0)||lieuDuree(r)||''),repId:r.id,visId:v?v.id:'',fId:fo?fo.id:'',contenu:r.d.c_themes||'',rem:rem.join('\n')+(e.note?'\n'+e.note:''),
         todo:'',itin:''};
       const ins=[];for(let q=ei+1;q<A.length&&(A[q].t==='pause'||A[q].t==='repas')&&A[q].apres;q++){ins.push(A[q]);used.add(A[q])}
-      const sb=v&&ctiCanDetail(arr,v)?ctiSubs(arr,v):null,tot=sb?sb.reduce((n,x)=>n+num(x.duree),0):0,fs=ins.length&&v?ctiSubs(arr,v):null;
+      const sb=v&&ctiCanDetail(arr,v)?ctiSubs(arr,v,r):null,tot=sb?sb.reduce((n,x)=>n+num(x.duree),0):0,fs=ins.length&&v?ctiSubs(arr,v,r):null;
       if(fs&&fs.length>=2){const out=[...fs],mine=new Set(),tail=[];   /* pause ou repas dans la visite : le détail est coupé après l'étape choisie */
         ins.forEach(x=>{const L2=entLine(x);let ix=-1;out.forEach((s2,q)=>{const m=s2.modCode&&modByCode(v,s2.modCode);if(m&&m.ptId===x.apres)ix=q});
           if(ix<0||ix>=out.length-1){tail.push(L2);return}while(mine.has(out[ix+1]))ix++;out.splice(ix+1,0,L2);mine.add(L2)});
@@ -1856,7 +1862,7 @@ async function licInit(){try{const s=await DB.get('kv','licence');LIC=s?await li
 function profilId(){if(LIC.state==='valide'||LIC.state==='expiree'){const t=String(LIC.nom||'').trim().split(/\s+/);return {prenom:t[0]||'',nom:t.slice(1).join(' ')}}return {prenom:'Licence',nom:'Démonstration'}}
 async function profilSync(){const id=profilId();if(profil.prenom!==id.prenom||profil.nom!==id.nom){profil={...profil,...id};try{await DB.put('kv',profil,'profil')}catch(e){}}}
 /* Numéro de version affiché dans « À propos » : à garder identique à la constante V de sw.js (tiango-vNN) */
-const APP_VER='27.1',APP_MAIL='contact@tiango.fr';
+const APP_VER='27.3',APP_MAIL='contact@tiango.fr';
 async function appVers(){try{const k=(await caches.keys()).filter(x=>/^tiango-v/.test(x)).sort();return k.length?k[k.length-1].replace('tiango-v',''):''}catch(e){return ''}}
 function aboutSheet(){
   $('#modal').innerHTML=sheetHTML('À propos de Tiango',`<div class="box" style="text-align:center"><picture><source srcset="logo-dark.png" media="(prefers-color-scheme:dark)"><img class="brand" src="logo.png" alt="Tiango" style="max-width:180px"></picture>
@@ -2347,7 +2353,7 @@ function guiModel(c,x={}){
     if(l.contenu)B.push({p:'Thème du commentaire : '+l.contenu});
     const v=(x.vis||[]).find(v=>v.id===l.visId);
     if(fl&&v&&l.type!=='trajet'&&l.type!=='pec'&&l.type!=='fin'){
-      const fo=l.fId&&v.formules.find(f=>f.id===l.fId),mo=l.modCode&&modByCode(v,l.modCode),S=mo?[mo]:ctiSteps(v,fo);
+      const fo=l.fId&&v.formules.find(f=>f.id===l.fId),mo=l.modCode&&modByCode(v,l.modCode),S=mo?stepMods(v,mo,fo):ctiSteps(v,fo);
       S.forEach(m=>{const t=(m.texte||{})[fl];B.push({h3:[m.code,m.lieu||(m.titre&&m.titre[fl])].filter(Boolean).join(' — ')+(num(m.duree)?' ('+mins(num(m.duree))+')':'')});
         if(m.cle)B.push({small:'Message clé : '+m.cle});if(m.place)B.push({small:'Où placer le groupe : '+m.place});
         if(m.consigne)B.push({small:'Consigne (jamais prononcée) : '+m.consigne});
@@ -2446,7 +2452,7 @@ VIEWS.ctiRun={item:1,get back(){return guiBack||'guiList'},t:()=>esc(item.titre|
       ['Toilettes',[y('s_wc'),d.s_wc_d].filter(Boolean).join(' — ')],['Accès fauteuil',y('p_acc')],['Cheminement',d.p_chem],['Dernière admission',d.h_dern],['Retrait des billets',d.t_billet],['Points de vigilance',d.x_risq],['Solution de repli',d.x_planb],['Abri',y('s_abri')]].filter(x=>x[1]);
     $('#modal').innerHTML=sheetHTML(d.site||'Fiche de repérage',`<p class="mute">${esc([d.adresse,d.cp,d.ville].filter(Boolean).join(' '))}${rep.gps?` · <a href="${esc(gpsUrl(rep.gps))}" target="_blank" rel="noopener" style="color:var(--pri)">Voir sur la carte</a>`:''}${d.date?'<br>Relevé le '+esc(frDate(d.date))+' : à revérifier si la fiche est ancienne.':''}</p>`
       +(R.map(x=>bx2(x[0],esc(x[1]))).join('')||'<p class="mute">La fiche ne contient pas encore d\'informations pratiques.</p>'));$('#mNo').onclick=closeModal};
-  if(v)$('#rVis').onclick=()=>{const mo=l.modCode&&modByCode(v,l.modCode);if(mo){play={seq:[mo],i:0,nom:mo.lieu||mo.code,fs:19,back:['ctiRun',c.id]};return go('visPlay',v.id)}const fo=l.fId&&v.formules.find(f=>f.id===l.fId);if(fo&&fSeq(v,fo).length&&!dupCodes(v).length){play={seq:fSeq(v,fo),i:0,nom:fo.nom||'Formule',fs:19,back:['ctiRun',c.id]};return go('visPlay',v.id)}choosePlay(v,(seq,nom)=>{play={seq,i:0,nom,fs:19,back:['ctiRun',c.id]};go('visPlay',v.id)})};
+  if(v)$('#rVis').onclick=()=>{const mo=l.modCode&&modByCode(v,l.modCode);if(mo){play={seq:stepMods(v,mo,l.fId&&v.formules.find(f=>f.id===l.fId)),i:0,nom:mo.lieu||mo.code,fs:19,back:['ctiRun',c.id]};return go('visPlay',v.id)}const fo=l.fId&&v.formules.find(f=>f.id===l.fId);if(fo&&fSeq(v,fo).length&&!dupCodes(v).length){play={seq:fSeq(v,fo),i:0,nom:fo.nom||'Formule',fs:19,back:['ctiRun',c.id]};return go('visPlay',v.id)}choosePlay(v,(seq,nom)=>{play={seq,i:0,nom,fs:19,back:['ctiRun',c.id]};go('visPlay',v.id)})};
   $('#rPb').onclick=()=>{const all=[...new Set(L.map(x=>x.visId).filter(Boolean))].map(id=>vis.find(x=>x.id===id)).filter(Boolean),src=v?[v]:all,nx=L.slice(r.i+1).find(x=>x.type!=='trajet'&&x.type!=='fin'&&!obj(r.ov[x.id]).skip);
     $('#modal').innerHTML=sheetHTML('Plan B',bx2('Solution de repli prévue',esc(c.h.meteo||''))+(rep?bx2('Repli noté au repérage',esc(rep.d.x_planb||'')):'')
       +src.map(s=>s.planb.filter(p=>p.sit||p.sol).map(p=>bx2(esc((src.length>1?s.nom+' — ':'')+(p.sit||'Situation')),esc([p.sol,p.duree&&'Durée : '+p.duree].filter(Boolean).join('\n')))).join('')).join('')
